@@ -207,6 +207,7 @@ EPIC_FILES = {
         "test_tree_recurrence.py",
         "test_structured_recurrence.py",
         "test_regime_pair_derivation.py",
+        "test_destination_softmax_derivation.py",
         "test_hybrid_separator_derivation.py",
         "test_structured_recurrence_engine.py",
         "test_structured_recurrence_learning.py",

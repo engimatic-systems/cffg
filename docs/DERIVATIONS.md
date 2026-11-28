@@ -4023,3 +4023,217 @@ RSS outside that count. At depth two the largest prefix has 64 categories;
 explicitly listing every complete commitment would take $4^{57}$ entries.
 The source guard counts dense CPTs, including all uses of shared transitions,
 before allocating them. Process memory can be much larger than this guard.
+
+## D18 — Destination-softmax recurrence with a Gaussian drive (cff-dlrj)
+
+### D18.1 Decision and plain-English companion
+
+Some switching models choose a destination by comparing *all* its scores at
+once. D8 chooses it through a sequence of yes/no decisions. Both can describe
+a binary decision. With three or more choices their dependence on a continuous
+state generally differs.
+
+A global quadratic bound gives a tractable Gaussian message and an auditable
+node energy for the first model. Its accuracy depends on how many labels
+represent the alternatives. In a 32-label example, an exact mean-field
+coordinate assigns one source probability **0.40744**. The quadratic coordinate
+assigns it **0.000335**. Both use the same drive, observations and external
+messages. Splitting equivalent destination labels accounts for the discrepancy.
+
+**Decision.** Qualify an alternative bound under cds-1t47 before proposing a
+runtime factor. The following equations and executable oracle are a research
+contract for ordinary sum-product VMP. The implemented decision-list
+recurrence uses D8's gate bound and D9's structured categorical pair.
+D18 considers a factorized source and destination at the local node.
+
+### D18.2 Conditional law, identifiable coordinates and external mapping
+
+Let $i$ index the source and $j$ one of $K$ destinations. Let $x$ be the drive.
+For fixed $i$ the $K$ rows of $W_i$ and vector $b_i$ define
+
+$$z_i=W_i x+b_i,\qquad f(z)=\log\sum_j e^{z_j},\qquad
+  \log p(j\mid i,x)=z_{ij}-f(z_i).$$
+
+Adding $\mathbf1(a_i^\top x+c_i)$ to a source's logits leaves its law
+unchanged. Use the zero-sum gauge $P=I-\mathbf1\mathbf1^\top/K$ by centering
+the weights and offsets over destinations. Equivalently let $U$ have $K-1$
+orthonormal columns spanning $\mathbf1^\perp$. For learning, use
+$[W_i,b_i]=U C_i$ with exactly $(K-1)(d+1)$ free coefficients. This fixes the
+gauge algebraically. Other identification issues, such as a drive that never
+varies along one axis, still depend on the data.
+
+In the pinned `ssm` source, `RecurrentTransitions` at step $t$ adds three
+terms to each destination logit. The intercept is
+`log_Ps[i,j]`, the observed input contributes `Ws[j] @ input[t+1]` and
+the drive contributes `Rs[j] @ data[t]`. Normalize over $j$.
+Set our rows to `Rs[j]` shared over $i$ and add the known input term to
+the intercept, or include the known input as fixed features. In
+`RecurrentOnlyTransitions`, set $b_{ij}=$ `r[j]` plus that input term for
+every $i$. This second variant repeats the entire row over sources. Apply $P$
+after either mapping. Our general $W_i$ also permits source-specific slopes.
+These mappings identify the conditional law. Fitted objectives, priors and
+learners require their own comparison.
+[Pinned source-dependent transitions](https://github.com/lindermanlab/ssm/blob/eb6c8aa33e5311d3564075807dec340759dd8081/ssm/transitions.py#L265-L299)
+and [pinned source-independent transitions](https://github.com/lindermanlab/ssm/blob/eb6c8aa33e5311d3564075807dec340759dd8081/ssm/transitions.py#L318-L353).
+
+**Which softmaxes admit an affine binary tree?** At an internal node with
+nonempty left and right leaf sets $L,R$, the gate log odds must equal
+$f(z_L)-f(z_R)$. Every such difference must be affine in $x$. That condition
+is also sufficient, since multiplying the conditional path probabilities
+telescopes to the leaf probability. For a decision list the first difference
+is one affine score minus the log-sum-exp of the remaining scores.
+
+For a one-dimensional example choose distinct slopes $2^j$ and zero
+intercepts. If even the root gate were affine, the sum of exponentials on the
+left would equal a positive constant times the sum on the right multiplied
+by $e^{a x}$. Exponentials with distinct slopes are linearly independent.
+Thus the two slope sets must be translates with equal cardinality.
+All nonzero differences of two members of this set are unique (factor the
+difference into a power of two times an odd integer). Two or more matched
+pairs cannot share the translation. The disjoint root groups therefore cannot
+satisfy the identity for $K>2$. Conversely, set a tree's root gate to a
+constant and a lower gate to $\sigma(x)$, with all other gates constant. The
+odds of a leaf below the varying gate against a leaf outside that subtree have
+logarithm $\text{constant}+\log\sigma(x)$ for the accepting branch.
+An affine destination softmax has affine log odds for *every* leaf pair.
+
+Overlap includes $K=2$, drive-independent probabilities, and special grouped
+logits satisfying the gate criterion at every split. For instance logits
+$(0,u,v,u+v)$ with affine $u,v$ describe two independent binary choices on
+the balanced four-leaf tree. Conditional equivalence alone does not identify
+the variational bound: D8 uses the Jaakkola–Jordan bound at each active gate.
+
+### D18.3 Expected log probability and the bound
+
+Use the factorized local belief $r_i s_j q_x(x)$ with $q_x=N(m,S)$ proper.
+VMP needs $\mathbb E\log p(j\mid i,x)$. The Gaussian expectation of
+$f(W_i x+b_i)$ is generally nonanalytic. Numerical quadrature gives a
+low-dimensional accuracy check, while a sample average can err on either
+side. For an objective with a guaranteed sign, use the Hessian
+$\nabla^2 f=\operatorname{diag}(p)-pp^\top$ at $p=\operatorname{softmax}(z)$.
+Its directional curvature is the variance of the selected entry of a vector
+$v$. That variance is at most
+$(\max v-\min v)^2/4\leq\|Pv\|^2/2$. Hence for every anchor $a$,
+
+$$f(z)\leq f(a)+p(a)^\top(z-a)+\tfrac12(z-a)^\top H(z-a),
+\qquad H=P/2.$$
+
+At $a_i=\mathbb E z_i$ this has the smallest expectation among these
+tangencies. Indeed each tangent quadratic majorizes $f(\mathbb E z_i)$ at
+the mean, and its expected curvature correction is the same
+$\frac12\operatorname{tr}(H\,\mathrm{Cov}(z_i))$. For fixed coefficients put
+$a_i=W_i m+b_i$. The per-pair bounded score is
+
+$$T_{ij}=a_{ij}-f(a_i)-\tfrac12\operatorname{tr}(H W_i S W_i^\top)
+\ \leq\ \mathbb E\log p(j\mid i,x).$$
+
+For uncertain Gaussian coefficients independent of $x$, use their expected
+logits and total logit covariance in the same formula. With
+$\phi=(x^\top,1)^\top$, $u=\mathbb E\phi$ and $M=\mathbb E\phi\phi^\top$,
+$a_i=U\,\mathbb E C_i\,u$. In the $U$ chart the trace correction is one
+quarter the sum over coefficient rows $c$ of
+$\bar c^\top\mathrm{Cov}(\phi)\bar c+
+\operatorname{tr}(\mathrm{Cov}(c) M)$, where $\bar c=\mathbb E c$.
+These positive moment terms avoid subtracting two uncentered energies.
+No assumption of independence between entries of a coefficient row is needed.
+
+### D18.4 Stationary messages, sharing and entropy ownership
+
+For fixed anchors let $B(j,z_i;a_i)$ be the lower log likelihood obtained by
+subtracting the tangent quadratic from $z_{ij}$. The local Lagrangian
+minimizes
+$\sum_v\int q_v\log q_v-\mathbb E_q B
+-\sum_v\int q_v\log m_{\rm ext,v}
++\sum_v\lambda_v(\int q_v-1)$ over the normalized local marginals.
+The external terms are the cavity multipliers for matching adjacent
+beliefs. Variation gives $\log m_{a\to v}=\mathbb E_{q_{\setminus v}}B
++\text{constant}$. Multiply this message by the incoming cavity and
+normalize on its support. For the two categorical roles,
+
+$$\log m_{a\to j}=\sum_i r_i T_{ij}+\mathrm{const},\qquad
+  \log m_{a\to i}=\sum_j s_j T_{ij}+\mathrm{const}.$$
+
+Let $g_i=s-p(a_i)+H a_i$. The part of the bound depending on $z_i$, after
+averaging over $j$, is $g_i^\top z_i-\frac12 z_i^\top H z_i$. Completing
+the quadratic in $x$ gives the Gaussian information pair
+
+$$\Lambda_x=\sum_i r_i\,\mathbb E[W_i^\top H W_i],\qquad
+\eta_x=\sum_i r_i\{\mathbb E[W_i]^\top g_i-
+                                  \mathbb E[W_i^\top H b_i]\}.$$
+
+The expectations reduce to ordinary products for point coefficients.
+The precision message may be semidefinite, including zero on directions
+that the likelihood does not inspect. Form a proper belief with its cavity
+before evaluating Gaussian moments. Refreshing $a_i$ at the current expected
+logits tightens the bound; a stationary equation gives no guarantee that a
+simultaneous loopy sweep converges.
+
+For an unknown coefficient block, flatten $C_i$ in row-major order. The
+message's precision and information vector are
+
+$$\Lambda_{C_i}=\tfrac{r_i}{2}\,I_{K-1}\otimes M,\qquad
+  \eta_{C_i}=r_i\,\operatorname{vec}_{\rm row}[(U^\top g_i)u^\top].$$
+
+Thus a source of zero mass supplies zero statistics. A Gaussian prior can
+combine the sufficient quadratic and linear terms over actual observations.
+A point update optimizes the same anchored quadratic, with gradient
+$r_i[(U^\top g_i)u^\top-C_iM/2]$ in the reduced chart. For a tied coefficient
+$\theta$ with $\operatorname{vec}(C_i)=L_i\theta+d_i$, accumulate
+$\sum_i L_i^\top\Lambda_{C_i}L_i$ and
+$\sum_i L_i^\top(\eta_{C_i}-\Lambda_{C_i}d_i)$ into its **one** owner.
+A free prior or a rank-deficient design can leave directions unidentified.
+Exact softmax learning retains its nonconjugate normalizer; these Gaussian
+statistics belong to this particular bound and are distinct from D8's
+binary-gate statistics.
+
+With optimized anchors the local energy for fixed coefficients is
+
+$$F_a^{\rm quad}=-H(r)-H(s)-H(q_x)-\sum_{ij}r_i s_j T_{ij}.$$
+
+Include $-H(q_\theta)$ once per distinct incident random coefficient
+variable when it belongs to the local factorization. A separate coefficient
+prior enters the graph once. Apply the ordinary $+H(q_e)$ correction per
+interior Forney edge; sharing through equality must preserve the single
+logical entropy. These corrections are identical on both sides of the
+bound at matched beliefs. The proposed energy is **above** the exact
+mean-field transition energy evaluated at those beliefs. This comparison
+does not certify the evidence of a general loopy Bethe graph. P-substitution,
+GFE, and max-product require separate semantics and are outside this contract.
+
+### D18.5 Accuracy at scale and handoff
+
+Compute each row's curvature from centered weight rows, accumulating
+$W_i^\top W_i/2$ for that source in drive coordinates. A fixed-parameter
+sweep needs $O(K^2d^2)$ arithmetic and $O(K^2d+K^2+d^2)$ storage including
+the weights. There is no source-by-destination-by-destination array.
+The coefficient statistic is a structured Kronecker product; materializing
+all dense per-source parameter Hessians would lose this storage bound.
+
+At $d=16$, use only $x_1\sim N(0,1)$, with identity covariance on all
+coordinates. Two live sources have equal incoming mass. One has alternating
+logits $+x_1,-x_1$ repeated to fill $K$ destinations. The other has constant
+zero logits. Take a uniform destination belief. Relative to the constant
+source, the exact expected-log penalty is $\mathbb E\log\cosh(x_1)$ for
+every even $K$. At quadrature orders 96 and 192 it is 0.37456720749 nats.
+The quadratic bound charges $K/4$ nats. At $K=32$, the extra 7.62543 nats
+changes that source's updated mass from 0.40744 to 0.000335. These are
+stationary **source coordinates at the stated beliefs**, not frequencies of
+simulated transitions.
+
+Ticket cds-1t47 will qualify a bound invariant under equal replication of
+all labels. One candidate upper-bounds $\mathbb E f(z)$ by
+$\log\sum_j\mathbb E e^{z_j}$ after removing the common affine logit.
+For fixed coefficients the Gaussian exponential moments are analytic.
+Its Gaussian coordinate and curvature require a new derivation. Fixed
+inference, learning and integration should follow an accuracy decision there.
+
+The independent oracle exercises $K=2,3,4$ conditionals, the binary-tree
+counterexamples, Gaussian quadrature, entropy accounting and finite-difference
+checks of each coordinate, including tied coefficient scores. The 32-label
+fixture runs in float32 and float64. Tolerances on probability sums and
+Gaussian rank admission scale with dimension and dtype epsilon. Exact
+categorical zeros carry zero mass and log-cavity exclusions remain negative
+infinity. A zero destination belief still leaves that category in the
+conditional's softmax normalizer. Empty support, invalid required moments
+and nonfinite energies are failures. An improper or vacuous Gaussian cavity alone cannot supply an
+expected score. [Executable oracle](../tests/test_destination_softmax_derivation.py)

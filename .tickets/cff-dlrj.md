@@ -1,6 +1,6 @@
 ---
 id: cff-dlrj
-status: open
+status: in_progress
 deps: []
 links: [cff-0f3g, cff-nkbj]
 created: 2026-08-10T02:58:08Z
@@ -127,3 +127,15 @@ Classification-note additions: complete=the enumerated derivation contract;
 intended=the contextual assignments in this note; explicit_owner and
 named_ticket_handoff=cff-dlrj owns derivation while future implementation
 tickets would own production surfaces.
+
+**2026-11-28T04:20:59Z**
+
+Planning. D18 tests a global quadratic upper bound on the destination log normalizer, derived from categorical Hessian curvature after removing the common-logit gauge. The native decision-list and tree work uses a different conditional. Pin both relevant ssm classes at eb6c8aa. Check exact Gaussian quadrature at small K, source and destination stationary scores, Gaussian and coefficient derivatives, literal support, invalid beliefs and the K=32,D=16 bound gap. Architecture row New factor or rule family applies for future work. IR, compiler, host/JIT, flood/scheduled, vmap, learning state and checkpoint decoding are N/A in this independent derivation and oracle. Gauss owns D8.6. D18 is appended after D17.
+
+**2026-11-28T04:26:58Z**
+
+D18 derives a valid quadratic bound and all coordinate scores. Its K=32 duplicated-label fixture moves the source probability from 0.407438 under quadrature to 0.00033535. Defer production pending a replication-invariant alternative. The standalone oracle passed 13 focused checks with uv run --frozen --no-sync pytest -q tests/test_destination_softmax_derivation.py, including both precisions. The reference for both ssm classes is eb6c8aa33e5311d3564075807dec340759dd8081. The dashboard lists the oracle. Gauss owns the combined gate and closure.
+
+Legend: prerequisite --> dependent
+[in progress] cff-dlrj --> [blocked] cds-1t47 (Gaussian softmax bound research under cff-ahps)
+[parallel] cff-4sor (binary-tree derivation under cff-0f3g)
