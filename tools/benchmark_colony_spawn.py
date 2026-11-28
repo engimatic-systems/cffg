@@ -5,7 +5,7 @@ families come from the retained P4/H15 reactor fixture. Run with a clean baselin
 checkout. Each arm uses the candidate's locked Python environment.
 """
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, SUPPRESS
 from dataclasses import replace
 import hashlib
 import json
@@ -157,7 +157,7 @@ def main():
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--repetitions", type=int, default=3)
-    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--worker", action="store_true", help=SUPPRESS)
     args = parser.parse_args()
     if args.repetitions < 1:
         parser.error("--repetitions must be positive")
