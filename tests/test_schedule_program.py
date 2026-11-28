@@ -16,6 +16,7 @@ from test_schedule import A, D, unit_categorical, vmp_unit_template
 from cffg import schedule_program
 from cffg.compiler import compile_template
 from cffg.core import BlobRef, FactorSpec, Template, VariableSpec
+from cffg.core.compose import merge
 from cffg.engine import Engine, _make_bfe, _replace
 from cffg.execution.owners import SCHEDULED_EXECUTORS
 from cffg.execution.synchronous import make_sweep
@@ -26,7 +27,7 @@ from cffg.schedule_program import _batch_stage_fn, _flat_scan_fn, build_schedule
 def program_arena(kind, semiring="sum"):
     if kind == "mixed":
         template, arrays = vmp_unit_template(), {"A": A, "d": D}
-    elif kind == "colored":
+    elif kind in ("colored", "mixed_cycle"):
         names = ("a", "b", "c")
         template = Template(
             "program-ring",
@@ -43,6 +44,9 @@ def program_arena(kind, semiring="sum"):
             blobs={"B": BlobRef("B", "B")},
         )
         arrays = {"B": np.asarray([[0.8, 0.3], [0.2, 0.7]])}
+        if kind == "mixed_cycle":
+            template = merge(template, vmp_unit_template(), "mixed-cycle")
+            arrays.update({"A": A, "d": D})
     else:
         template, arrays = unit_categorical(), {"p": np.asarray([0.2, 0.3, 0.5])}
     return compile_template(template, arrays=arrays, semiring=semiring)
@@ -102,6 +106,8 @@ def test_program_composes_only_required_stages_and_preserves_facade(kind, dtype)
     assert (program.reconstruct is not None) == (
         kind == "mixed" and bool(program.schedule.forest_stages)
     )
+    if kind == "mixed":
+        assert program.reconstruct is program.prime
     if kind in ("two_pass", "flood"):
         assert program.iter_step is program.step
     with pytest.raises(FrozenInstanceError):
@@ -114,6 +120,27 @@ def test_program_composes_only_required_stages_and_preserves_facade(kind, dtype)
     for left, right in zip(jax.tree.leaves(actual), jax.tree.leaves(reference), strict=True):
         assert left.shape == right.shape and left.dtype == right.dtype
         np.testing.assert_array_equal(left, right)
+
+
+def test_mixed_cycle_reconstruction_leaves_cyclic_messages_untouched():
+    engine = Engine(program_arena("mixed_cycle"))
+    program = engine._schedule_program
+    assert program.schedule.kind == "mixed" and program.schedule.colors > 0
+    assert program.reconstruct is not program.prime
+
+    state = engine.init_state()
+    args = (
+        state.messages, state.g_eta, state.g_lam, state.ef_eta,
+        state.g_obs, state.g_mask, state.ef_obs, state.ef_mask, state.params,
+    )
+    primed = program.prime(*args)[0]
+    reconstructed = program.reconstruct(*args)[0]
+    slots = [slot for name in ("a", "b", "c") for slot in (
+        engine.arena.edges[name].slot0, engine.arena.edges[name].slot1
+    )]
+    rows = np.array(slots)
+    np.testing.assert_array_equal(reconstructed[rows], state.messages[rows])
+    assert not np.array_equal(primed[rows], reconstructed[rows])
 
 
 @pytest.mark.parametrize("dtype", (np.float32, np.float64))
