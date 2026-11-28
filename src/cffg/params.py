@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 import jax.numpy as jnp
 import numpy as np
 
+from cffg.changing_learning import check_count_representation
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from cffg.compiled import MemberAddress, ParameterAddress
     from cffg.engine import Engine
@@ -244,6 +246,22 @@ def set_params(
                     f"tied blob {address.blob!r} role {role!r} received unequal values"
                 )
             requested[blob_role] = value.copy()
+
+    # Named writes to learned transition tables must retain their declared face.
+    for plan in engine.arena.learn_plans:
+        if plan.change_hazard is None:
+            continue
+        allowed = np.asarray(plan.transition_support)
+        axis = 1 if plan.ftype == "transition_mixture" else 0
+        for target in plan.targets:
+            value = requested.get((target.blob, target.role))
+            if value is None:
+                continue
+            if not np.array_equal(value > 0, allowed):
+                raise ValueError(f"learnable {plan.name!r}: named write changes transition support")
+            with np.errstate(over="ignore", under="ignore"):
+                candidate = np.asarray(value, dtype=params[target.key].dtype)
+            check_count_representation(plan.name, candidate, allowed, axis)
 
     writes: list[_RuntimeWrite] = []
     for member in engine.arena.member_of.values():

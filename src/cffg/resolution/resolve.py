@@ -79,7 +79,7 @@ def resolve_compile_data(
         )
         addresses.add(template, draft.arrays)
     for draft in specialized.transition_gfe:
-        parameters.update(pack_transition_gfe(draft, resolved))
+        parameters.update(pack_transition_gfe(draft, resolved, template))
         addresses.add(template, draft.arrays)
     for draft in specialized.hybrid_gfe:
         parameters.update(pack_hybrid_gfe(template, draft, resolved))

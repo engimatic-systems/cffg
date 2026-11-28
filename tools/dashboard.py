@@ -59,7 +59,7 @@ EPIC_FILES = {
         "test_vmp.py",
         "test_gfe.py",
         "test_dirichlet_param_edges.py",
-        "test_transition_change_derivation.py", "test_transition_change_update.py",
+        "test_transition_change_derivation.py", "test_transition_change_update.py", "test_changing_transition_learning.py",
         "test_mu3_derivation.py",
         "test_mu3.py",
         "test_goal_hyperprior.py",

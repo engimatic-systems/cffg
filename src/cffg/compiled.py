@@ -376,6 +376,8 @@ class LearnPlan(ImmutableRecord):
     sources: tuple[str, ...]  # factor names, sorted
     targets: tuple[LearnTarget, ...]
     semantic_identity: str
+    change_hazard: float | None = None
+    transition_support: FrozenArray | None = None
 
 
 @dataclass(frozen=True)

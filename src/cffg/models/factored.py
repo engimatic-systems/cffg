@@ -328,6 +328,7 @@ def build_factored_rollout(
     learned_c: bool = False,
     epistemic_b: bool = False,
     transition_counts: Mapping[str, np.ndarray] | None = None,
+    transition_hazards: Mapping[str, float] | None = None,
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """Build a factored planning/perception window and its parameter arrays.
 
@@ -392,6 +393,7 @@ def build_factored_rollout(
         cards[block.name] = card
         initials[block.name] = initial
 
+    hazards = {} if transition_hazards is None else dict(transition_hazards)
     for block in block_tuple:
         parents: tuple[str, ...] = ()
         if block.selector is not None:
@@ -414,6 +416,8 @@ def build_factored_rollout(
             cards[block.name],
         )
         transition = np.asarray(block.transition)
+        if block.transition_learnable in hazards and transition.dtype.kind not in "fiu":
+            raise ValueError(f"changing transition {block.name!r} needs a real numeric table")
         if transition.shape != expected:
             raise ValueError(
                 f"factored rollout: transition for {block.name!r} has shape "
@@ -525,6 +529,9 @@ def build_factored_rollout(
         for block in block_tuple
     }
 
+    declared_transitions = {b.transition_learnable for b in block_tuple if b.transition_learnable in learn}
+    if set(hazards) - declared_transitions:
+        raise ValueError("transition_hazards must name active transition learnables")
     count_blobs = {}
     if epistemic_b:
         owners = {
@@ -551,11 +558,17 @@ def build_factored_rollout(
                 )
             with np.errstate(over="ignore", under="ignore"):
                 packed_counts = counts.astype(dtype, copy=False)
-            if not np.isfinite(packed_counts).all() or not (packed_counts > 0).all():
+            if owner in hazards:
+                table = transitions[block.name].reshape(shape)
+                if (np.any(counts < 0) or not np.isfinite(packed_counts).all()
+                        or not np.array_equal(counts > 0, table > 0)
+                        or not np.array_equal(packed_counts > 0, table > 0)):
+                    raise ValueError(f"transition_counts for {owner!r} disagree with the transition support")
+            elif not np.isfinite(packed_counts).all() or not (packed_counts > 0).all():
                 raise ValueError(
                     f"transition_counts for {owner!r} must be finite and positive in model dtype {dtype}"
                 )
-            if np.any(transitions[block.name] == 0):
+            if owner not in hazards and np.any(transitions[block.name] == 0):
                 raise ValueError(
                     f"transition_counts for {owner!r} need a full-support transition table"
                 )
@@ -848,6 +861,7 @@ def build_factored_rollout(
                     )
                 ),
                 sources,
+                change_hazard=hazards.get(block.transition_learnable),
             )
     if observation.learnable is not None and observation.learnable in active_learn:
         template.learnables[observation.learnable] = LearnableSpec(
@@ -909,6 +923,7 @@ def build_factored_corridor(
     learned_c: bool = False,
     epistemic_b: bool = False,
     transition_counts: Mapping[str, np.ndarray] | None = None,
+    transition_hazards: Mapping[str, float] | None = None,
 ) -> tuple[Template, dict[str, np.ndarray]]:
     """The canonical two-block corridor: position × persistent mode.
 
@@ -1011,4 +1026,5 @@ def build_factored_corridor(
         learned_c=learned_c,
         epistemic_b=epistemic_b,
         transition_counts=transition_counts,
+        transition_hazards=transition_hazards,
     )

@@ -146,6 +146,7 @@ def to_dict(t: Template) -> dict[str, Any]:
                 "family": ln.family,
                 "blobs": list(ln.blobs),
                 "semantic_identity": ln.semantic_identity,
+                **({"change_hazard": ln.change_hazard} if ln.change_hazard is not None else {}),
                 **({"sources": list(ln.sources)} if ln.sources is not None else {}),
             }
             for name in sorted(t.learnables)
@@ -289,6 +290,7 @@ def from_dict(d: dict[str, Any]) -> Template:
                 tuple(spec["blobs"]),
                 tuple(spec["sources"]) if "sources" in spec else None,
                 declaration_identity(name, spec["family"], spec, learning_version),
+                spec.get("change_hazard"),
             )
             for name, spec in d.get("learnables", {}).items()
         },

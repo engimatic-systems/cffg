@@ -415,10 +415,23 @@ and pass the builder `transition_counts={name: alpha}`. Enable
 `epistemic_b=True` on the planning window or `RollingAgent`. For example,
 a valve with two commands and three states takes counts of shape
 `(2, 3, 3)` in command, next-state, previous-state order. A coupling's
-parent axes precede those three. Every entry in a selected table and its
-prior counts must be positive. Future slices use the prior and each
-committed observation updates the same owner for the next plan. Other
+parent axes precede those three. For the default stationary learner, every
+entry in a selected table and its prior counts must be positive. Future
+slices use the prior and each committed observation updates the same
+owner for the next plan. Other
 blocks keep their declared transitions, including any exact zeros.
+
+For a block whose dynamics may change, also pass the builder
+`transition_hazards={name: 0.02}`. Each physically committed update gives
+each column a 2% chance of resetting to its initial concentrations before
+the event. A zero count in the reset prior must agree with a zero in the
+authored transition table. This fixes the column’s allowed outcomes for
+the run. `agent.learnables.params[name]["alpha"]` holds the committed
+posterior. `agent.learnables.predicted_transition_counts(name)` gives
+the concentrations supplied to the next planning window. Calling it or
+planning repeatedly consumes no observations. A saved changing posterior
+requires its original hazard and reset prior on restore. See D1a in
+`docs/DERIVATIONS.md` for the approximation and its measured novelty error.
 
 Functional mu3 uses explicit JAX keys and fixed particles within one inference
 attempt. Record ESS and support facts, and use `score_mu3_epochs` only when the

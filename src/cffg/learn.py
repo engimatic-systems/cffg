@@ -58,6 +58,13 @@ import numpy as np
 
 from cffg import ef, efrules
 from cffg.core.learning_identity import LEARNING_IDENTITIES
+from cffg.changing_learning import (
+    check_count_representation,
+    expected_log as _expected_log,
+    predict as _predict,
+    projected,
+    validate_learning_state,
+)
 from cffg.learning_schema import (
     PERSISTENT_MANIFEST_KEY,
     PersistentParameter,
@@ -408,8 +415,12 @@ class Learnables:
             given = (
                 priors[name] if name in priors else self._from_compiled(engine, plan)
             )
+            if plan.change_hazard is not None:
+                values = given.values() if isinstance(given, dict) else (given,)
+                if any(np.iscomplexobj(value) for value in values):
+                    raise ValueError(f"learnable {name!r}: transition counts must be real")
             params = family.as_params(given)
-            family.validate_prior(name, params, plan.shapes)
+            validate_learning_state(plan, family, params)
             initial = {}
             for key, value in params.items():
                 frozen = value.copy()
@@ -478,6 +489,8 @@ class Learnables:
             if name not in self.params:
                 raise KeyError(f"engine declares {name!r}, which this Learnables lacks")
             family = FAMILIES[plan.family]
+            if plan.change_hazard is not None and not plan.sources:
+                continue
             base = self.initial_params[name] if replace else self.params[name]
             candidate = {key: value.copy() for key, value in base.items()}
             if plan.sources:
@@ -498,8 +511,12 @@ class Learnables:
                         raise ValueError(
                             f"learnable {name!r}, source {source!r}: {exc}"
                         ) from exc
-                candidate = family.fold(candidate, family.pool(records))
-            family.validate_prior(name, candidate, plan.shapes)
+                pooled = family.pool(records)
+                if plan.change_hazard is None:
+                    candidate = family.fold(candidate, pooled)
+                else:
+                    candidate = projected(plan, self.initial_params[name], candidate, pooled["n"])
+            validate_learning_state(plan, family, candidate)
             pending[name] = {
                 key: np.asarray(value).copy() for key, value in candidate.items()
             }
@@ -529,6 +546,10 @@ class Learnables:
                 raise KeyError(
                     f"engine declares {plan.name!r}, which this Learnables lacks"
                 )
+            if (plan.change_hazard != original.change_hazard
+                    or (plan.change_hazard is not None and not np.array_equal(
+                        plan.transition_support, original.transition_support))):
+                raise ValueError(f"learnable {plan.name!r} has an incompatible changing-transition declaration")
             if (plan.family, plan.ftype, plan.semantic_identity) != (
                 original.family, original.ftype, original.semantic_identity
             ):
@@ -573,14 +594,23 @@ class Learnables:
             if name not in self.params:
                 raise KeyError(f"engine declares {name!r}, which this Learnables lacks")
             family = FAMILIES[plan.family]
-            family.validate_prior(name, self.params[name], plan.shapes)
+            validate_learning_state(plan, family, self.params[name])
+            predicted = _predict(plan, self.initial_params[name], self.params[name])
             by_form: dict[str, dict[str, np.ndarray]] = {}
+            checked_dtypes = set()
             for tgt in plan.targets:
+                dtype = params[tgt.key].dtype
+                if plan.change_hazard is not None and dtype not in checked_dtypes:
+                    with np.errstate(over="ignore", under="ignore"):
+                        raw = np.asarray(predicted["alpha"], dtype=dtype)
+                    check_count_representation(name, raw, np.asarray(plan.transition_support),
+                                               family.axis(plan.ftype))
+                    checked_dtypes.add(dtype)
                 if tgt.form not in by_form:
                     by_form[tgt.form] = (
-                        family.rollover(self.params[name], plan.ftype)
+                        _expected_log(plan, family, predicted)
                         if tgt.form == "expected"
-                        else family.raw(self.params[name], plan.ftype)
+                        else family.raw(predicted, plan.ftype)
                     )
                 value = by_form[tgt.form][tgt.role]
                 if tgt.layout == "tm":
@@ -596,8 +626,12 @@ class Learnables:
                     # one dtype ULP toward zero; no magnitude floor or
                     # probability support is invented.
                     neg = np.asarray(NEG, dtype=value.dtype)
+                    collision = value == neg
+                    if plan.change_hazard is not None:
+                        allowed = np.asarray(plan.transition_support)
+                        collision &= allowed.transpose(1, 2, 0) if tgt.layout == "tm" else allowed
                     value = np.where(
-                        value == neg,
+                        collision,
                         np.nextafter(neg, np.asarray(0.0, dtype=value.dtype)),
                         value,
                     )
@@ -625,6 +659,14 @@ class Learnables:
             )
         return next(iter(out.values()))
 
+    @_committed
+    def predicted_transition_counts(self, name: str) -> np.ndarray:
+        """Next real event's concentrations, without advancing the committed posterior."""
+        plan = self.plans[name]
+        if plan.family != "dirichlet" or plan.ftype not in ("matrix_cat", "transition_mixture"):
+            raise ValueError(f"learnable {name!r} is not a transition table")
+        return _predict(plan, self.initial_params[name], self.params[name])["alpha"].copy()
+
     def rollover(self, name: str, role: str | None = None) -> np.ndarray:
         """The point parameter consumed by the next inference run.
 
@@ -632,7 +674,8 @@ class Learnables:
         posterior mean but inference consumes an expected natural parameter.
         """
         plan = self.plans[name]
-        out = FAMILIES[plan.family].rollover(self.params[name], plan.ftype)
+        predicted = _predict(plan, self.initial_params[name], self.params[name])
+        out = _expected_log(plan, FAMILIES[plan.family], predicted)
         if role is not None:
             return out[role]
         if len(out) != 1:
@@ -766,6 +809,8 @@ class Learnables:
                 )
             seen.add((name, key))
             if payload is None:
+                if self.plans[name].change_hazard is not None:
+                    raise ValueError(f"learnable {name!r}: legacy checkpoint lacks the changing-transition declaration")
                 recurrence.require_identity(name)
             if np.iscomplexobj(arr):
                 raise ValueError(
@@ -809,5 +854,5 @@ class Learnables:
                 )
         for name in changed:
             plan = self.plans[name]
-            FAMILIES[plan.family].validate_prior(name, pending[name], plan.shapes)
+            validate_learning_state(plan, FAMILIES[plan.family], pending[name])
         self.params.update({name: pending[name] for name in changed})

@@ -139,10 +139,13 @@ class LearnableSpec:
     blobs: tuple[str, ...]  # every blob this posterior writes
     sources: tuple[str, ...] | None = None  # stat suppliers; None = all readers
     semantic_identity: str | None = None
+    change_hazard: float | None = None
 
     def __post_init__(self):
         from cffg.core.learning_identity import LEARNING_IDENTITIES
 
+        if type(self.change_hazard) is int:
+            object.__setattr__(self, "change_hazard", float(self.change_hazard))
         if self.semantic_identity is None:
             object.__setattr__(
                 self, "semantic_identity", LEARNING_IDENTITIES.get(self.family, "")

@@ -31,3 +31,11 @@ Starting from the published stationary feature at 294994d (#230) above the D1a d
 **2026-11-28T06:39:21Z**
 
 Dependency direction is prerequisite --> dependent. [closed] ctcp-6msb (D1a) + [closed] ctcl-p70e (native stationary control) + [ready] cctr-1vvy (pure projected update) --> ctcp-w305 (declaration, learning and restore) --> ctcp-qodi (frozen behavioral comparison). Structural-face encoding belongs to the runtime integration; changing allowed topology over time is outside the D1a model.
+
+**2026-11-28T06:47:18Z**
+
+Before running the stationary parity comparison: use two binary-action valve fixtures with dense positive transition columns, starting latent priors [1,0] and [.3,.7], and applied sequences (0,0),(1,1),(0,1). Compare ordinary undeclared vs declared h=0 posterior after each event, every planning message up to normalization, BFE, status, and MAP. Bounds 128 dtype eps for messages and concentrations and 256 eps per slice for BFE; exact public MAP (first-index tie) and status required. Separate changing trials use a sparse face and a noisy sensor for fractional truth-independent counts. Include persisted replay, mask/digest errors, batch/eager/JIT, and full D1a references.
+
+**2026-11-28T07:04:07Z**
+
+Integrated declaration and hash, copied/scoped ownership, immutable face lookup, real-event fold and predicted parameters, named writes, checkpoint and bundle restore. The 10 integration cases passed, including matching all directed messages, node-local GFE and complete action ordering at h=0 in real float32 and float64. Tied readers pool once and independently selected blocks advance separately. Candidate-only subnormal mass outside the face is rejected before a cast can erase it. The 6 pure-update tests cover eager, compiled and batched arithmetic. No rule, objective, stopping criterion, schedule or key changed. The canonical short gate and named compatibility files remain for closure. The study stays on ctcp-qodi.

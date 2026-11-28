@@ -267,6 +267,12 @@ def _check_learnables(t: Template) -> list[str]:
             expected = LEARNING_IDENTITIES.get(spec.family)
             if expected is not None and spec.semantic_identity != expected:
                 raise ValueError(f"unknown or incompatible semantic identity {spec.semantic_identity!r}")
+            if spec.change_hazard is not None:
+                h = spec.change_hazard
+                if type(h) not in (int, float) or not 0 <= h <= 1:
+                    raise ValueError("change_hazard must be a real probability from zero to one")
+                if spec.family != "dirichlet":
+                    raise ValueError("change_hazard needs a Dirichlet transition learnable")
             for scoped in (name, *spec.blobs, *(spec.sources or ())):
                 check_scoped_name(scoped)
             if spec.sources is not None and len(set(spec.sources)) != len(spec.sources):
