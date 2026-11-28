@@ -73,9 +73,9 @@ def gaussian_goal_chain(length=2, mean=0.0):
 
 
 @pytest.mark.parametrize("enabled,length", [
-    (False, 2), pytest.param(True, 2, marks=pytest.mark.slow), (True, 20),
+    (False, 2), pytest.param(True, 2, marks=pytest.mark.slow), pytest.param(True, 20, marks=pytest.mark.slow),
 ])
-@pytest.mark.parametrize("tol", [None, 1e-6])
+@pytest.mark.parametrize("tol", [pytest.param(None, marks=pytest.mark.slow), 1e-6])
 def test_irrelevant_hardening_preserves_exact_gaussian_result(enabled, length, tol):
     with jax.enable_x64(enabled):
         template, arrays, observations = gaussian_goal_chain(length)
@@ -94,7 +94,7 @@ def test_irrelevant_hardening_preserves_exact_gaussian_result(enabled, length, t
 
 
 @pytest.mark.parametrize("size", [pytest.param(1, marks=pytest.mark.slow), 3])
-@pytest.mark.parametrize("budget,damp", [(0, 0.0), (5, 0.0), pytest.param(5, 0.5, marks=pytest.mark.slow)])
+@pytest.mark.parametrize("budget,damp", [pytest.param(0, 0.0, marks=pytest.mark.slow), (5, 0.0), pytest.param(5, 0.5, marks=pytest.mark.slow)])
 def test_colony_matches_distinct_gaussian_engines(size, budget, damp):
     colony = Colony()
     references = {}

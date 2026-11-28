@@ -58,7 +58,7 @@ def test_exact_zeros_deterministic_and_vacuous_evidence_preserve_support():
     np.testing.assert_array_equal(enumerated.singleton, posterior.singleton)
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 def test_dtype_tolerance_and_engine_readout(dtype):
     result = diagnose_case(2, dtype=dtype)
     assert result["sum_product_message_error"] <= result["tolerance"]

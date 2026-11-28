@@ -100,6 +100,7 @@ def test_serialization_round_trip_compiles_and_agrees():
     )
 
 
+@pytest.mark.slow
 def test_vmap_batch_equals_sequential():
     # Colony contract: Gaussian instances sharing a structure batch too.
     t, arrays = lgssm(T, F, Q, H, R, M0, P0)

@@ -131,7 +131,7 @@ def test_wrapper_keeps_asymmetric_source_destination_axes():
 
 @pytest.mark.parametrize("dtype,card", [
     pytest.param(np.float32, 2, marks=pytest.mark.slow), (np.float32, 3),
-    (np.float64, 2), pytest.param(np.float64, 3, marks=pytest.mark.slow),
+    pytest.param(np.float64, 2, marks=pytest.mark.slow), pytest.param(np.float64, 3, marks=pytest.mark.slow),
 ])
 def test_engine_pair_regions_and_bfe_match_fixed_drive_chain(card, dtype):
     engine, result, oracle, weights, offsets, tolerance = _chain(card, dtype)
@@ -239,6 +239,7 @@ def test_engine_gaussian_write_uses_joint_pair_not_singleton_product():
     assert max(product_gaps) > 100 * tolerance
 
 
+@pytest.mark.slow
 def test_flood_and_mixed_schedules_share_pair_regions_messages_and_bfe():
     mixed_engine, mixed, _, weights, offsets, tolerance = _chain(
         3, np.float64, "auto"

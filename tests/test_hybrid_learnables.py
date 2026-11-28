@@ -450,6 +450,7 @@ def test_restricted_runtime_and_public_rollover_use_declared_contract():
     )
 
 
+@pytest.mark.slow
 def test_pg_scheduled_and_flooded_statistics_produce_same_posterior():
     posteriors = []
     for schedule in ("auto", "flood"):
@@ -487,6 +488,7 @@ def test_pg_hostile_statistics_and_precision_fail_before_mutation(monkeypatch):
         np.testing.assert_array_equal(learnables.state_dict()[key], value)
 
 
+@pytest.mark.slow
 def test_pg_float32_k32_d16_updates_and_writes_without_dense_transition():
     with jax.enable_x64(False):
         _template, _arrays, sources, engine, result = _run_recurrence(
@@ -557,7 +559,7 @@ def test_hybrid_learning_rejects_incompatible_family_pair(builder, family, match
         compile_template(template, arrays=arrays)
 
 
-@pytest.mark.parametrize("builder", (_mixture_template, _recurrence_template))
+@pytest.mark.parametrize("builder", (pytest.param(_mixture_template, marks=pytest.mark.slow), _recurrence_template))
 def test_hybrid_learning_declaration_does_not_change_inference_or_ledger(builder):
     template, arrays, _sources = builder()
     undeclared = dataclasses.replace(template, learnables={})
@@ -575,6 +577,7 @@ def test_hybrid_learning_declaration_does_not_change_inference_or_ledger(builder
     assert left_engine.bfe(left.state) == right_engine.bfe(right.state)
 
 
+@pytest.mark.slow
 def test_component_mniw_plate_copies_pool_into_one_tied_posterior():
     fragment, arrays, _sources = _mixture_template()
     fragment.learnables["neutral_dynamics"] = dataclasses.replace(
@@ -678,3 +681,54 @@ def test_hybrid_legacy_checkpoint_requires_complete_posterior(
     with pytest.raises(KeyError, match="incompletely names"):
         learnables.load_state_dict(partial)
     learnables.load_state_dict(legacy_checkpoint)
+
+
+@pytest.mark.parametrize("x64,schedule", [(False, "flood"), (True, "auto")])
+def test_component_mniw_retains_translated_conditional_spread(x64, schedule):
+    with jax.enable_x64(x64):
+        t, arrays, sources = _mixture_template(regimes=3, dimension=1)
+        origin = 4096. if not x64 else 2.**27
+        arrays.update(matrix=np.zeros((3, 1, 1)), offset=np.full((3, 1), origin),
+                      cov=np.array([1., 3., .5])[:, None, None],
+                      output_cov=np.eye(1), output_mean=np.array([origin]))
+        engine = Engine(compile_template(t, arrays=arrays), schedule=schedule)
+        result = engine.run(engine.init_state(), 100, tol=1e-6)
+        prior = conj.MNIW(np.array([[0., origin]]), np.eye(2), 3. * np.eye(1), 4.)
+        learning = Learnables(engine, {"neutral_dynamics": (prior,) * 3})
+        learning.accumulate(engine, result)
+        variance = arrays["cov"].ravel()
+        weight = arrays["selector_probability"] / np.sqrt(1 + variance)
+        weight /= weight.sum()
+        scale = 3. + len(sources) * weight * variance / (1 + variance)
+        np.testing.assert_allclose(learning.params["neutral_dynamics"]["psi"][:, 0, 0],
+                                   scale, atol=1e-6, rtol=1e-6)
+        assert learning.params["neutral_dynamics"]["nu"][-1] == prior.nu
+
+
+def test_component_mniw_compact_updates_preserve_resolved_directions_and_resume(tmp_path):
+    from cffg import load_bundle, save_bundle
+
+    t, arrays, _, engine, result = _run_mixture()
+    name = "neutral_dynamics"
+    priors = (conj.vague_mniw(2, 2),) * 3
+    params = Learnables(engine, {name: priors}).params[name]
+    compact = Learnables(engine, {name: {k: v.astype(np.float32) for k, v in params.items()}})
+    compact.accumulate(engine, result)
+    assert all(compact.params[name][k].dtype == np.float32 for k in ("m", "lam", "psi"))
+    assert compact.params[name]["nu"].dtype == np.float64
+    path = tmp_path / "compact.cffgz"
+    save_bundle(path, t, arrays, learnables=compact)
+    resumed = load_bundle(path).learnables
+    assert resumed.persistent_descriptors() == compact.persistent_descriptors()
+    for learner in (resumed, compact):
+        learner.accumulate(engine, result)
+    assert resumed.persistent_descriptors() == compact.persistent_descriptors()
+
+    from cffg.hybrid_learning import _retain_component_dtype
+    identity = np.eye(2, dtype=np.float32)[None]
+    # Rounding erases the tiny contrast in an otherwise positive, near-rank-one gain.
+    gain = np.array([[[1., 1.-1e-9], [1.-1e-9, 1.]]])
+    precise = identity + gain
+    assert _retain_component_dtype(identity, precise, matrix=True).dtype == np.float64
+    mean = np.array([[2.**18]], dtype=np.float32)
+    assert _retain_component_dtype(mean, mean.astype(float) + .001, matrix=False).dtype == np.float64

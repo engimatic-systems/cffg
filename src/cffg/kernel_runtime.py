@@ -183,10 +183,12 @@ def gaussian_energy(group, eta, precision, params, observation=None, mask=None):
 
 
 def gaussian_readout(
-    group, eta, precision, params, observation=None, mask=None, *, statistics=False
+    group, eta, precision, params, observation=None, mask=None, *, statistics=False, centered=False
 ):
     binding = group.kernel.binding
     callback = binding.statistics if statistics else binding.readout
+    if statistics and centered and binding.centered_statistics is not None:
+        callback = binding.centered_statistics
     values = callback(
         eta, precision, params, group.dims, group.observed_role, observation, mask
     )

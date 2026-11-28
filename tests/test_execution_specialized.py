@@ -201,25 +201,33 @@ def assert_vmap(execute, inputs):
 
 @pytest.mark.parametrize(
     "kind,dtype",
-    [pytest.param(kind, dtype, id=f"{kind}-{np.dtype(dtype).name}",
-                  marks=pytest.mark.slow if dtype is np.float64 and kind != "dirichlet" else ())
-     for kind in (
-        "mixture",
-        "mixture_prior",
-        "hybrid_gfe",
-        "hybrid_prior",
-        "recurrence",
-        "precision",
-        "dirichlet",
-        "gfe",
-        "gfe_learned",
-        "gfe_goal",
-        "gfe_functional",
-        "transition",
-        "transition_fixed",
-        "stationary",
-        "importance",
-    ) for dtype in (np.float32, np.float64)],
+    [
+        pytest.param(
+            kind, dtype, id=f"{kind}-{np.dtype(dtype).name}",
+            marks=pytest.mark.slow if (
+                (dtype is np.float64 and kind != "dirichlet")
+                or kind in {"mixture_prior", "hybrid_prior", "gfe_learned", "gfe_goal", "transition_fixed"}
+            ) else (),
+        )
+        for kind in (
+            "mixture",
+            "mixture_prior",
+            "hybrid_gfe",
+            "hybrid_prior",
+            "recurrence",
+            "precision",
+            "dirichlet",
+            "gfe",
+            "gfe_learned",
+            "gfe_goal",
+            "gfe_functional",
+            "transition",
+            "transition_fixed",
+            "stationary",
+            "importance",
+        )
+        for dtype in (np.float32, np.float64)
+    ],
 )
 def test_specialized_blocks_and_existing_facts_survive_jitted_vmap(kind, dtype):
     execute, inputs = local_case(kind, dtype)

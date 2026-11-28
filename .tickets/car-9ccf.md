@@ -1,7 +1,7 @@
 ---
 id: car-9ccf
 status: in_progress
-deps: [cff-lquu, cff-6tek, cff-qg1d, cff-7t4j, cff-xfnx]
+deps: [cff-lquu, cff-6tek, cff-qg1d, cff-7t4j, cff-xfnx, caoc-0dvd]
 links: []
 created: 2026-11-23T21:48:38Z
 type: feature

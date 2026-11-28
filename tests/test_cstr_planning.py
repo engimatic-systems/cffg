@@ -72,7 +72,7 @@ def test_strict_updates_reject_partial_goals_before_a_forward_prior_arrives(meth
 
 
 @pytest.mark.parametrize("method", ["linearization", "sigma_point"])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_partial_information_is_not_a_normalized_gaussian(method, dtype):
     with jax.enable_x64(dtype is np.float64):
         eta = jnp.array([1., 0., 0., 1.], dtype=dtype)

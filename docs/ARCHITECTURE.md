@@ -1688,10 +1688,10 @@ them. Four rules define the contract:
    family names which engine readout it draws from (`cffg.learn.READOUTS`),
    because a conjugate posterior is not always one array read off one
    readout. An MNIW over a `gaussian_linear` carries four hyperparameters,
-   accumulates three statistics from `Engine.gaussian_node_stats`, and rolls
-   over into three blobs at different shapes. Component MNIW uses the same
-   statistic names with leading selector axes and occurrence counts equal to
-   soft responsibilities. PG weights instead draw additive `linear` and
+   reads conditional means and covariances from `Engine.gaussian_node_stats`,
+   and rolls over into three blobs at different shapes. Component MNIW
+   receives the same conditional statistics with leading selector axes.
+   Each component contributes its soft responsibility exactly once. PG weights instead draw additive `linear` and
    `quadratic` records from `Engine.recurrence_weight_stats`. A `LearnTarget`
    names both the blob it writes and the parameter role that blob fills, which
    routes every multi-parameter write. `Dirichlet` is the degenerate case of
@@ -1712,6 +1712,24 @@ them. Four rules define the contract:
    graph supplies the statistics and writes
    `E[log θ] = ψ(α) − ψ(α₀)`.
 
+   Declared Gaussian NIW updates request the mean and covariance directly with
+   `Engine.gaussian_node_stats(state, centered=True)`. The prior binding computes
+   these moments before any raw second moment is formed. The default readout
+   still supplies raw statistics to callers that request that representation.
+   Declared MNIW uses the joint (output, input) mean and the three distinct
+   covariance blocks. Conditioned outputs supply only the input covariance.
+   The host solves for a coefficient increment relative to the stored prior
+   using QR and accumulates squared residuals as derived in D4.2.
+
+   For component MNIW, a float32 coefficient, column-precision or noise-scale
+   array keeps its dtype when rounding changes each evidence increment by at
+   most √ε relative to that increment (ε is float32 machine epsilon).
+   Matrix increments must satisfy the bound in every direction, and the
+   stored matrix must remain resolvably positive definite. If the check
+   fails, the affected array keeps the float64 result. Counts stay in the
+   host update precision. Saving and loading preserve each stored dtype
+   and value exactly.
+
    The `component_niw` family reads centered per-component moments from
    `gaussian_mixture`. It shares the existing declared-learning transaction,
    rollover and bundle machinery. The batched mixed-data API in
@@ -1721,7 +1739,72 @@ them. Four rules define the contract:
    input bank on numerical failure. Versioned host snapshots preserve the
    component axis, categorical head order, precision and occupancy mask.
    These arrays describe a finite bank whose semantic fields and category
-   order are supplied by the model.
+   order are supplied by the model. Compact mixed snapshots save the rounded
+   parameters; exact snapshots also save the corrections carried into the
+   next update. The component lifecycle v2 envelope holds compact v2 mixed
+   records for its reset prior and posterior. The optional exact lifecycle v1
+   envelope retains the original pair of v3 mixed records. Both codecs validate
+   identity metadata and require dormant parameters to match the reset prior.
+   Device-to-host conversion uses the exact codec.
+
+   Frame-local appearance regression is owned by `frame_regression.py`.
+   `score_pixels` evaluates the expected log likelihood for each pixel
+   under each occupied slot. `fit_frame` takes one immutable regression prior,
+   one Gaussian design belief per slot and fractional pixel assignments.
+   The caller owns slot growth, coordinate iteration and reuse of the prior.
+
+   The spatial experiment in `experiments/axiom_spatial.py` alternates a
+   per-pixel assignment with the Gaussian position update from all pixels
+   assigned to a slot. The motion prediction can initialize the iterate;
+   its separately supplied Gaussian prior appears once per coordinate fit.
+   Absolute likelihood and assignment probability have distinct outputs.
+   `experiments/axiom_slots.py` owns the raw-frame encoding, seeded
+   appearance and position initialization, and worst-pixel growth. On each
+   attempted birth it records the forced pixel and previously unoccupied
+   slot. Accepted frames return their assignments and inferred positions.
+   The tracker reads the appearance transform at the position mean and the
+   inverse expected observation precision for each output channel.
+
+   In the AXIOM experiment, `axiom_evidence.release_view` derives the
+   scale used by the release to score Gaussian evidence. Its explicit
+   normalized diagonal and off-diagonal cutoffs can change a birth decision.
+   Updates and resets use the original sufficient statistics. Unmasked
+   reduction queries may separately expose seeded virgin components. Scoring
+   uses a shared covariance repair across the full bank. Synthetic observation
+   draws use the unshifted projection and repair their sampled covariance.
+
+   Every 500 real actions, the experiment can call
+   `experiments.axiom_reduction.reduce_interactions` to draw synthetic
+   records and append them to its retained sample. It evaluates proposed
+   merges sequentially on that same sample. Context selects a component
+   across the whole bank. Exposure determines whether its predicted reward
+   and motion switch contribute to the score. A change in the shared
+   covariance repair triggers rescoring of the untouched components too.
+   Restarting reduction requires its retained sample, random key and action
+   count alongside the learned bank.
+
+   `experiments/axiom_observation.py` consumes an RGB frame, the action
+   actually applied and its reward. Identity updates receive previous
+   appearance from eligible foreground slots. The interaction learner sees
+   that previous scene with its freshly inferred identities and the motion
+   switch observed in the transition. A reset frame can update perception
+   while retaining learned dynamics and the real action count. An invalid
+   observation keeps the previous scene and clears the learning receipts.
+
+   `rollout_planning.sample_action_sequences` executes an immutable parameter
+   snapshot on action sequences. Each policy, sample and time index gets a
+   stable random key. The AXIOM experiment owns its independent object
+   prediction kernel, proposal refit and scoring function. Its reward and
+   count-based novelty are reported separately. This path advances imagined
+   states and leaves the learned posterior available for real observations.
+
+   The AXIOM experiment uses `experiments/axiom_tracking.py` to carry observed
+   slot descriptors and their covariances between frames. Pixel winners determine
+   visibility. Summed soft assignments determine foreground. The identity write
+   mask selects previously visible slots using the current foreground mask.
+   Motion and interaction writes use the current tracking mask. An observation
+   with learning disabled advances the carry and closes both write masks. The
+   scene integrator owns the learned banks and checkpoint envelope.
 
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a
@@ -1862,6 +1945,106 @@ the window transformation for that registered matrix-categorical,
 joint-boundary case. It does not turn the two immutable templates into a
 literal mutable graph or establish the transformation for mean-field,
 continuous, hybrid, or hierarchical boundaries.
+
+##### Continuous and hybrid rolling boundaries (design for `cff-wdhj`)
+
+The first extension carries **one joint Gaussian** between a planning template
+and a one-transition perception template. The implemented slice is
+`RollingAgent.from_gaussian_bundles` for fixed affine Gaussian windows, a
+deterministic mean command and raise-on-failure planning. Its declarations
+are `GaussianPlanSpec` and `GaussianFilterSpec`. Their JSON names the window
+and orders the state coordinates, command components and first-action indices.
+The known-selector hybrid, marked hold policy and online learning below are
+the remaining design for `cff-wdhj`.
+
+**Model declaration.** Opt in with `agent.version = 2`. Both templates name
+the same logical state coordinates in the same order and units. Each binds
+them to a single vector-valued `gaussian` prior with named mean and covariance
+roles. Perception also names the posterior edge. A committed belief is its
+finite mean `(d,)` and full, proper covariance `(d,d)` at the execution
+precision. Read the joint with `Engine.gaussian_marginal` and inject both
+moments with validated member writes. A state and an inferred disturbance in
+the same vector retain their cross-covariance. Reject an improper readout,
+overlapping parameter owners or a proposed joint assembled from separate
+edges. A missing observation masks the likelihood and carries the proper
+prediction. A singular prior or a partly missing vector needs a different
+declaration.
+
+| Window | Continuous action | Categorical action selecting Gaussian dynamics |
+|---|---|---|
+| Plan | Read the posterior mean at declared, ordered indices of one Gaussian edge. The indices can select the current control from an augmented state. Return the raw vector in the declared action coordinates. | Read the normalized first-selector marginal. Use the existing MAP tie rule or seeded categorical sampling. Preserve zero support. |
+| Perceive | Declare a controlled affine transition with offset `b + B @ applied`. Name the transition, its fixed base offset and control-matrix blob. Check dimensions and write the effective offset for that transition from the base on every tick. | Bind the executed index to the selector DATA port in the one-step filter. The selected transition acts on the carried Gaussian. The plan's action preferences belong only to the plan. |
+
+The hybrid case models a **known executed switch**. Competing actions in the
+plan use the declared Gaussian-mixture moment approximation. A persistent
+*hidden* regime would also need its probabilities and conditional state
+moments, or a declared approximation across the boundary. For example, two
+equiprobable regimes with opposite state means can have the same marginal
+Gaussian after interchanging their labels and yield different next
+predictions. The first extension rejects such a boundary. Gaussian sampling,
+an integrated box-constrained action solve and arbitrary nonlinear command
+transforms are outside its scope. A caller can bound or replace the proposal
+and pass the physical command back in the model's units.
+
+**One transition.** The v2 public operations are a planning call with a
+preview and a separate observation call with the decision tick and applied
+command. Start tick `t` with a filtered boundary, including any initial
+observation the caller used to construct it. Plan from a copy, with
+the declared goal DATA ports bound only to the preview available at `t`.
+On success, return a proposal tagged with the tick, inference status and
+objective. The caller selects a failure policy. A failed solve or invalid
+readout raises with the diagnostic or returns a marked hold of the last
+*applied* command. Holding requires an initial command for the first tick.
+Planning can advance a selection key and stage a pending decision. Repeating
+the call with the same tick and preview returns that decision. A different preview
+for an outstanding decision is an error.
+
+Commit `(t, applied, observation_at_t_plus_1)` once. Bind the actual command
+and new sensor value, check convergence and the complete boundary, and stage
+the declared per-transition learning from that filter result. Planning goals
+and model-generated observations supply no learning statistics. A fully
+missing sensor tick advances the prediction and skips the learning update.
+Advance belief, learning, last applied command and tick together. Reject
+duplicate or out-of-order feedback. A filter or learning failure leaves the transition pending for
+retry with the same evidence. An episode starts from its declared initial
+belief, clears pending work and the previous command, and retains the declared
+learning history. The legacy categorical episode and learned-goal cadence
+continue to use their existing rules.
+
+**Reconstruction and restart.** Store each template and its numeric blobs in
+its own `.cffgz`. Each bundle uses that window's learning descriptors, which
+can name different sources. Bind the controller checkpoint to both structure
+hashes, fixed numeric inputs (including `B`, base and reset priors), immutable
+learning priors and execution settings. Use a version-2 controller envelope
+with a checked inventory of typed arrays. It stores the joint moments,
+current learning state, global and episode ticks, last applied command and
+owned RNG state. Between proposal and feedback it also stores the pending
+tick, preview identity, proposed command, status and objective/diagnostic.
+Resuming this phase returns the recorded decision without drawing again or
+repeating an external action. The caller owns the plant, observation stream
+and the record of whether a physical command actually ran. Restore validates
+the complete record before replacing live state. Compiled arenas and messages
+are reconstructed. Unversioned categorical declarations retain their current
+encoding and structure hashes, and use the existing checkpoint decoder.
+Reading an old checkpoint as a continuous boundary is an error.
+
+**Qualification boundary.** Compare the facade to manually driven Engines
+on the same rolled windows, including each window's free energy, and to a
+Kalman calculation on the linear case. Use a two-state correlated Gaussian,
+a sensor observing only the first coordinate, and an overridden command.
+In the hybrid case use two different affine branches, an exact-zero planning
+weight and feedback selecting a different branch. Restart in a fresh process
+from both windows and the controller checkpoint before and after feedback.
+Check the next action, filter, objective, learning update and key progression.
+The detailed acceptance cases are in `cff-wdhj`.
+
+An AXIOM agent also needs object identities, visibility and motion history,
+generation-tagged component banks, model-reduction samples, and a planning
+proposal and previous best action sequence. These affect future decisions
+even when the Gaussian moments agree. Their owners need typed, exact
+snapshots at the same committed tick, including their own random streams.
+An AXIOM episode can compose these records in its own checkpoint. A generic
+custom-state extension to `RollingAgent` would need a separate API decision.
 
 #### 3d. Factored rollout lowering (`cffg.models.factored`, cff-b47g)
 

@@ -462,3 +462,47 @@ def test_mniw_reporting_covariance_and_64_component_means(dtype):
             family.mean(params, "unused")
     with pytest.raises(ValueError, match="posterior-mean covariance undefined"):
         replace(posterior, nu=2.0).mean_cov()
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_centered_mniw_correlated_rows_match_independent_raw_oracle(dtype):
+    origin = 2**16 if dtype == np.float32 else 2**32
+    mean = np.array([[1., 2., -1.], [-1., .25, 2.], [0., 0., 0.]], dtype)
+    # The first row has a rank-one joint covariance; the second is a point.
+    root = np.array([1., .5, -.25], dtype)
+    covariance = np.zeros((3, 3, 3), dtype)
+    covariance[0] = np.outer(root, root)
+    weights = np.array([.25, .75, 0.], dtype)
+    prior = conj.MNIW(np.array([[.5, -.25, .75]]), np.eye(3), np.array([[3.]]), 5.)
+    augmented = np.column_stack((mean[:, 1:], np.ones(3)))
+    syy = np.array([[weights @ (mean[:, 0]**2 + covariance[:, 0, 0])]])
+    syx = (weights * mean[:, 0]) @ augmented
+    syx[:2] += weights @ covariance[:, 0, 1:]
+    sxx = augmented.T @ (weights[:, None] * augmented)
+    sxx[:2, :2] += np.einsum("n,nij->ij", weights, covariance[:, 1:, 1:])
+    reference = prior.update(syy, syx[None], sxx, weights.sum())
+
+    shifted = conj.MNIW(prior.m + [0., 0., origin], prior.lam, prior.psi, prior.nu)
+    mean[:, 0] += origin
+    mean[-1], covariance[-1] = np.nan, np.nan
+    assert shifted.update_centered(mean, covariance, weights * 0) is shifted
+    posterior = shifted.update_centered(mean, covariance, weights)
+    np.testing.assert_allclose(posterior.m, reference.m + [0., 0., origin], rtol=0, atol=np.spacing(float(origin)))
+    np.testing.assert_allclose(posterior.lam, reference.lam)
+    np.testing.assert_allclose(posterior.psi, reference.psi)
+    assert posterior.nu == reference.nu
+    covariance[0, 0, 1] += 2.
+    with pytest.raises(ValueError, match="semidefinite|symmetric"):
+        shifted.update_centered(mean, covariance, weights)
+
+
+def test_centered_mniw_rejects_rank_loss_in_stored_precision():
+    prior = conj.MNIW(np.zeros((1, 3)), np.eye(3), np.eye(1), 3.)
+    mean, covariance = np.zeros((1, 3)), np.eye(3)[None]
+    contrast = np.array([1., -1., 0.])
+    mean[0, 1:] = 4096.
+    good = prior.update_centered(mean, covariance, [1.])
+    assert contrast @ good.lam @ contrast == 4.
+    mean[0, 1:] = 2.**27
+    with pytest.raises(ValueError, match="column precision unresolved at stored precision"):
+        prior.update_centered(mean, covariance, [1.])

@@ -116,7 +116,7 @@ def assert_physical_cavities(engine, result, dtype):
         np.testing.assert_allclose(values, independent, rtol=0., atol=max(1e-5, 512 * np.finfo(dtype).eps))
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_recipe_sources_roundtrip_and_preserve_investigation_inputs(tmp_path, dtype):
     template, arrays, data = planning_model(dtype=dtype)
     np.testing.assert_array_equal(arrays["P0"], np.diag(np.array([.01, .001, 1e-4, .1], dtype=dtype)))

@@ -1,7 +1,7 @@
 ---
 id: car-kwjj
-status: open
-deps: [car-k6oi, car-8rgl, cff-cpxj]
+status: in_progress
+deps: [car-k6oi, car-8rgl, cff-cpxj, cff-zpk8, cff-961d, cff-vsn3, cat-825z]
 links: []
 created: 2026-11-23T21:48:38Z
 type: feature
@@ -34,3 +34,9 @@ Connecting live predicted motion and the public real-observation cycle belongs t
 ## Definitions
 
 A pixel assignment expresses how strongly a pixel belongs to a slot. A type groups objects with similar features. The Gamma precision controls inverse noise variance for one output dimension.
+
+## Notes
+
+**2026-11-24T06:00:54Z**
+
+The first image layer, hard-winner births, soft updates, frame-to-frame tracks and identity learning are implemented on the evaluation branch. The actual observations from three games produced finite updates in float32 and float64. All six halfway reloads reproduce the final arrays, including a real episode reset. Correctness evidence is mathematical, synthetic and fixed-action. The seeded absent-neighbor value is an explicit per-run JAX draw; the author release drew it from NumPy at trace time. A direct paired trace of the authors’ own solver would need separately authorized outputs (car-ozw0).

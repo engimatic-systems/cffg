@@ -18,7 +18,7 @@ from cffg.compiler import compile_template
 from cffg.engine import Engine, RunStatus, _replace
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize("schedule", ("auto", "flood"))
 @pytest.mark.parametrize("budget", (0, 8))
 @pytest.mark.parametrize("failure", ("nan", "infinity", "empty_support"))
@@ -236,7 +236,7 @@ def check_later_failure(
         assert np.isfinite(actual[iid].residual)
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize("schedule", ("auto", "flood"))
 @pytest.mark.parametrize(
     "failure", ("inner", "inner_budget", "energy", "support", "state")
@@ -247,7 +247,7 @@ def test_later_failure_reports_current_residual_and_preserves_healthy_peer(
     check_later_failure(monkeypatch, dtype, schedule, failure)
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize("representation", ("g_eta", "g_lam"))
 def test_nonfinite_changes_are_reported_for_each_continuous_representation(
     monkeypatch, dtype, representation
@@ -257,13 +257,13 @@ def test_nonfinite_changes_are_reported_for_each_continuous_representation(
     )
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize("failure", ("inner", "state"))
 def test_late_failure_is_isolated_in_a_larger_batch(monkeypatch, dtype, failure):
     check_later_failure(monkeypatch, dtype, "auto", failure, size=20)
 
 
-@pytest.mark.parametrize("dtype", (np.float32, np.float64))
+@pytest.mark.parametrize("dtype", (np.float32, pytest.param(np.float64, marks=pytest.mark.slow)))
 @pytest.mark.parametrize("failure", ("objective", "undefined_ledger"))
 def test_terminal_objective_and_undefined_ledger_failures_report_infinite_residual(
     monkeypatch, dtype, failure

@@ -217,6 +217,7 @@ def _rslds_parameters(dtype=np.float32):
     }
 
 
+@pytest.mark.slow
 def test_rslds_tier_matches_tiny_exact_oracle_and_rolls_all_parameters():
     """One compact integration tier: float32 inference, exact quadrature gap,
     finite ledger, and exact between-trial parameter installation."""
@@ -950,6 +951,7 @@ def test_float32_k32_d16_converges_without_cubic_plan_storage():
     )
 
 
+@pytest.mark.slow
 def test_vmap_step_matches_sequential():
     template, arrays = _template(
         weights=np.array([[[0.4]], [[-0.2]]]),

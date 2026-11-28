@@ -1,0 +1,98 @@
+{
+  "version": "gameworld-reference-v1",
+  "status": "Prospective specification. The recorded environment and analytic development evidence are complete. A candidate, pre-evaluation and evaluation have no scores in this release.",
+  "sources": {
+    "paper": "https://arxiv.org/html/2505.24784v1",
+    "radius_correction": "https://openreview.net/pdf/607c311748066d425e7d29a692d45b0e6686cdd2.pdf",
+    "game": "https://github.com/VersesTech/gameworld/tree/85493c477004ecfd3299b0b053884f23d59a5ec5",
+    "release": "https://github.com/VersesTech/axiom/tree/b99f62599e73294639f1944827bf427909f6c698",
+    "rights": "MIT Gameworld can supply native frames. The paper provides published aggregates. The separate authors' agent carries a restricted academic/nonprofit license. This reference uses source inspection and independently constructed examples. A native comparison requires documented authorization or appropriately shareable outputs.",
+    "release_git_blobs": {
+      "LICENSE": "bff389091d718f454c5bec3d5da4eb4451ffbf24",
+      "main.py": "c1b2a2d556b4f27503e977be63e9b99e34a7dc71",
+      "defaults.py": "35b8db99a19f7d10e98e9f4a1d42eabb5d437b47",
+      "axiom/infer.py": "ebfe01581a21fce4750e924e38a78336e2d7c1a6",
+      "axiom/planner.py": "1c5feaa8c34d772bd07aeffbc938d962aff9a071",
+      "axiom/models/smm.py": "bf40a24c111ba1c637d669428e09c4f8582e7da9",
+      "axiom/models/imm.py": "152f522129fd3d55c01001a6c94247367cfa35fd",
+      "axiom/models/tmm.py": "d0ddb52f1494036d7ca0afa124d41af64bc0cce1",
+      "axiom/models/rmm.py": "6144854e1cd251fd9e4ce8f3bb2fbd521efc6f02",
+      "axiom/models/utils_hybrid.py": "8cc725db93dd68521ea8823d7ab7e36b5c297222",
+      "axiom/vi/models/hybrid_mixture_model.py": "5fc97dfd26fe870eb9dfec28dcc63f4d5b67205d",
+      "axiom/vi/models/slot_mixture_model.py": "85bc190818b172e2d53a00b0468a928355f60b86",
+      "axiom/vi/exponential/mvn.py": "e58b00cee2bbf2591e4334212e7161c25fb044dd"
+    }
+  },
+  "reference_target": {
+    "implementation": "Use the pinned release behavior on the independently constructed fixtures. Separate any deliberately additive learner, prior-predictive birth, expected-log mixing-weight assignment, exact information gain, discounted action choice or safe full-bank refusal into labeled variants. Their results do not qualify the released configuration.",
+    "smm": "One 32-slot layer, 2D positions. Flatten full uint8 RGB HWC 210x160x3 into row-major [x,y,R,G,B]. Center and scale by [80,105,128,128,128]. Finite unit-initialized slot Dirichlet, fixed per-slot Gaussian prior with covariance I and normalized PRNGKey(0) prior means. Position scales .075, color .75, Gamma shape 11, rates scale squared, transform/bias prior precision 100/.001. Template 5 sets position diagonals and color bias at initialization. First frame assigns all pixels to slot 0. Two ordinary assignment/latent sweeps, per-frame hard occupancy, strict 5.7 threshold, up to 20 growth attempts. See spatial_sweep and slot_growth.",
+    "imm": "32 finite types, initially dormant with proper .1 Dirichlet parameters and full NIW continuous heads. Continuous scale .5, color precision scale 1. Uniform support among equal-score occupied rows. Match above -500; v1 parameter table uses -100. Fit previously visible foreground slots, including stationary objects. See assignment, birth, track_gates, soft_update and full_bank.",
+    "tmm": "500 fixed-capacity affine maps on six states with bias, four seeded maps (constant velocity, stay unused, become unused, stop). dt=1, variance=2, normalized log threshold derived from -1e-5. Birth authors an offset velocity or an absolute target above .2 displacement, small coefficients clipped at .00075. Existing maps retain their coefficients. Full bank leaves maps intact. See motion.",
+    "rmm": "5000 relational rows (10 per motion slot). Initial mixture concentrations .1, full continuous NIW scale 75 and six categorical heads: self type, other type, presence, applied action, reward, switch. Initial per-category concentrations [0.0001,0.0001,0.0001,0.0001,1,0.0001]. Threshold -10. Training includes observed reward and inferred switch; prediction omits those heads when choosing a component. Default features x,y,unused,10*vx,10*vy,dx,dy with nearest eligible neighbor. Base training and prediction radius .075.",
+    "reduction": "Every 500 actual actions, draw up to 2000 candidate pairs and 2000 model-generated records. Accumulate generated batches across reduction times, use the same data within each greedy pass. Require compatible modal own/other types, reward and switch. Context selects a component. Compare mean reward and switch expected log likelihood minus mixture weight KL. Accept a nondecreasing score if both rows are live, pool excess natural statistics, reset donor to prior and free its row.",
+    "planning": "32 steps, 512 open-loop strings, 3 stochastic samples each, one refit. Include random strings, prior proposal, previous best and constants as in planner.py. Fixed counts during imagination. Score includes reward plus .1 times the mean count-based novelty across slots. Reward uses the most extreme absolute object prediction. Top 10% by .99-discounted scores drive normalized, softmax-weighted proposal refit (scale 10). Execute first action of best undiscounted total. Replan after each actual transition.",
+    "fixed_radius": "Use the later review Appendix B to resolve the repeated 1.25 in v1. Set both train and predict radius to .8 for Jump, Drive, Cross, Aviate and 1.25 for other six. Both settings are explicit protocol choices because historical command lines are unavailable. Fixed-R also uses forward-predicted ellipse overlap, stable switch gating and five continuous features. It is a compound variant."
+  },
+  "games": ["Aviate","Bounce","Cross","Drive","Explode","Fruits","Gold","Hunt","Impact","Jump"],
+  "table1": {
+    "columns": "Pairs are published whole-number mean and SD over 10 seeds, in games order.",
+    "untuned": [[-90,19],[27,13],[-68,36],[-49,4],[180,30],[182,21],[190,18],[206,20],[189,45],[-55,9]],
+    "BBF": [[-90,5],[-1,15],[-48,7],[-37,6],[101,13],[86,15],[-26,12],[4,12],[122,20],[-96,17]],
+    "DreamerV3": [[-114,20],[14,16],[-27,8],[-45,6],[35,59],[60,7],[-21,10],[6,9],[168,83],[-55,17]],
+    "fixed_r": [[-76,13],[34,12],[-18,21],[-22,4],[234,16],[209,19],[189,16],[231,28],[192,9],[-38,25]],
+    "no_bmr": [[-87,12],[8,3],[-34,25],[-67,3],[165,14],[141,19],[45,15],[48,13],[197,21],[-45,5]],
+    "no_ig": [[-71,16],[8,19],[-7,3],[-32,2],[190,16],[200,20],[207,17],[216,11],[181,72],[-43,26]]
+  },
+  "splits": {
+    "development": {"model_seeds":[88101],"game_seed_base":180000,"steps":10000,"pilot_game":"Explode","purpose":"One downstream integration pilot plus existing development-only tapes with game seeds 41010..41019 and random action seeds 51010..51019. Fix model defects here."},
+    "pre_evaluation": {"model_seeds":[89101,89102],"game_seed_base":200000,"steps":1000,"purpose":"Two fresh seeds per game with base untuned arm and full planner. Exercise scheduled reduction twice, persist candidate, restore from the step-500 boundary; compare resumed actions, raw rewards, beliefs, RNG and next-plan digests exactly with uninterrupted continuation. Exercise natural and constructed reset paths. No reward-based selection."},
+    "evaluation": {"model_seeds":[90101,90102,90103,90104,90105,90106,90107,90108,90109,90110],"game_seed_base":300000,"steps":10000,"purpose":"Only after passing independent module fixtures, pilot and pre-evaluation. Every prespecified case is retained."}
+  },
+  "rng": "For each split, 0-based game index g in games and model-seed index i give game_seed=base+100*g+i. Start game MT19937 before construction and preserve it across all resets in a private RNG context. Model JAX key=PRNGKey(model_seed), any model NumPy draws use a separate MT19937 seeded with model_seed+1000000. Uniform random control uses NumPy PCG64(model_seed+2000000). Persist all evolving keys, proposal, game and model state. Fresh candidate per game/seed/arm. Matched variants use the same initial streams; action-dependent paths may diverge.",
+  "interface": "The actor sees only a copy of current native pixels, past applied actions and actual past rewards. Terminal steps deliver (post-frame, executed action, actual reward) once. A following reset delivers a distinct observation-only frame; retain learned parameters and count zero extra scored actions/rewards. Pin explicit terminated OR truncated handling; release main.py also ingests a reset observation with update=False after done. Keep reset, flags, labels, perturbation identity, private state and future input out of learned transitions.",
+  "conditions": {
+    "base": "No perturbation. Primary untuned, fixed_r, no_bmr and no_ig each use all 100 game/seed pairs.",
+    "no_bmr": "Disable periodic rMM merge calls only. Preserve novelty, birth, inference and planning budgets.",
+    "no_ig": "Set planning novelty weight to zero. Preserve model learning, merge, reward and rollout budgets.",
+    "perturb": "Run each game's native color and shape variant with untuned agent, one matched base run per seed. Give the simulator perturb_step=5000 actual actions, no reset at change. Record physical effects as well as pixels; identical actions need not give identical rewards. Log actual first changed returned frame; maintain a separate score for each condition.",
+    "privileged_remap": "Explode/color diagnostic: supply advance change timing for remapping only, update=False on one-based actions 5000 through 5020 inclusive (main.py:93-110); separate manifest, never an untuned result.",
+    "baseline": "Published BBF and DreamerV3 aggregates are unpaired descriptive comparators. An independently rerun baseline requires its own implementation, environment/action clocks, preprocessing and training resource manifest. BBF 84x84, two-frame max pooling; DreamerV3 96x96, batch 16 and train ratio 1024. Optional uniform random arm uses the action RNG, no model tuning."
+  },
+  "selection_and_release": [
+    "Record reviewed protocol, implementation commit, clean source snapshot and digests, Gameworld tree/import bytes, environment lock, runtime, precision, device, all seeds, action order and scoring code before pre-evaluation. Freeze model hyperparameters and variant list using development only.",
+    "Require exact discrete fixture outputs; compare continuous fixture values with the dtype tolerances in reference_cases.json. Keep native Gameworld evidence, independent analytic checks, candidate results and authorized native evidence distinguished. All required module cases, complete pilot and all 20 pre-evaluation runs must finish without illegal access, invalid output or resume mismatch. This is an engineering gate with no score threshold.",
+    "Keep evaluation seeds unopened until a signed-off pre-evaluation receipt binds those checks and hashes. A change to learner, seed protocol, threshold or scorer after pre-evaluation requires a new version, recorded reason and fresh qualification seeds. Retire any opened evaluation cohort for confirmatory use if it influenced a change. No seed replacement, best-of-run or early stopping for low return.",
+    "For every attempted run persist identity, status, stop reason, raw real rewards, applied actions, frame/checkpoint hashes and scored count. Record every failure in its assigned denominator. Infrastructure-only recovery must restore the last verified checkpoint and identical RNG continuation or repeat the same seed and bytes with original attempt retained. A model/numerical failure remains a failure. No fallback action, imputed rewards or partial success. Publish partial descriptive counts and suppress the formal complete-arm estimate and verdict on any missing/invalid run."
+  ],
+  "scoring": {
+    "raw": "Each post-action native reward is one record. Sum the 10000 real rewards across episode resets by game and seed. Report the sample mean, sample SD (ddof=1), all individual totals and full trailing 1000-action means; first curve point ends at action 1000. Also give last 1000 mean. Never sum the runner's rolling cumulative column.",
+    "primary": "Untuned vs published untuned raw return, ten seeds per game; signed delta=candidate minus published mean. Report all games and their unweighted macro mean. Choose +/-10 raw reward units for each game and macro (one net unit per 1000 real steps). This is a project practical tolerance, unrelated to observed candidate returns.",
+    "margin": 10,
+    "interval": "No historical paired seed effects are identifiable. Form simultaneous approximate 95% intervals for all 20 source means via union bound: two-sided t(9,1-.05/40) times sample SD/sqrt(10). Expand each reported historical mean by .5 for rounding and each SD to (SD+.5)*sqrt(10/9) for rounding/unknown SD convention. Subtract endpoints for unpaired differences, average endpoints for macro; this avoids assumptions about cross-game correlation. The t model assumes independent approximately normal seed totals within a game. Only a full interval within [-10,10] is agreement, an interval wholly above/below is a directional difference; otherwise inconclusive. A whole-suite agreement claim requires every per-game interval inside its margin; a macro result alone cannot establish this.",
+    "published_point_target": "Also report a separate replication target using the printed historical mean as a fixed numeric benchmark. For each game, use t9 intervals on ten candidate returns minus that constant. For the macro, average across games within each new model seed first. Apply the same +/-10 tolerance. These intervals convey candidate sampling uncertainty only. The conservative population-comparison interval above has a macro half-width of at least 30 reward units from published uncertainty alone. It can detect a sufficiently large directional difference; these aggregates cannot certify +/-10 macro population equivalence.",
+    "secondary": "For each paired fresh arm minus untuned, report per-game paired seed differences and two-sided descriptive t9 intervals on the 10 differences, plus macro intervals on ten equal-game means of paired differences by seed index. No multiplicity-adjusted secondary claim. Never treat adjacent windows, games from the same model seed, imagined rollouts or raw steps as independent seed replicates.",
+    "perturbation": "Report raw sums and rates separately for actions 1..5000 and 5001..10000, plus paired perturbed-minus-base differences by seed. Recovery is the first of two successive complete, nonoverlapping post-switch 250-action windows with rate at least the matched base rate minus .01 raw reward per action in each window. Report first window start offset (0..4500) and censor if absent by action 10000. Preserve unperturbed base and both affected trajectories.",
+    "precision": "All random trajectories are sample realizations. File/pixel hashes and encoded actions must match exactly for replay at the specified runtime. Report estimator uncertainty over independent seeds separately from dtype tolerances on analytic fixtures."
+  },
+  "inventory": {
+    "Table1": "Primary untuned campaign; fixed_r, no_bmr, no_ig separate matched campaigns; historical BBF/Dreamer benchmarks. All prospective.",
+    "Table2": "Deferred hardware reproduction. Count active and allocated parameters separately. Separate initialization/compile, model update, synchronized planning and wall time; pin hardware, runtime and rollout budget. Historical hardware one A100 40 GB per environment.",
+    "Table3": "Pinned release configuration and paper/release choices. Align any additional flags in the candidate launch receipt.",
+    "Fig1": "Model/inference diagram. Trace real observations through slot, identity, motion, interaction and plan in development pilot.",
+    "Fig2": "Ten-game visual inventory. MIT development frame tapes are available.",
+    "Fig3": "Raw 1000-action trailing mean/SD curves. Fresh candidate curves pending; BBF/Dreamer curves require raw histories.",
+    "Fig4": "Impact counterfactual 32-step trajectory; Explode component counts, expected utility/novelty, perturbation trace. Require recorded native candidate intermediate beliefs.",
+    "Fig5": "Deferred A100 scaling. Vary sampled plan count and slot count; record synchronized stage timings.",
+    "Fig6": "Deferred 100k-step BBF/Dreamer runs in Gold/Hunt; fresh baseline setup and longer budgets required.",
+    "Fig7": "Final 1000 per-step means for matched untuned, no_bmr, no_ig in all ten games.",
+    "Fig8": "Cross cluster visualization for the three arms using the first evaluation seed; save component weights/means and identities with the selection rule.",
+    "Fig9": "Deferred 12-cell rollout sweep for all ten games, first three evaluation seeds, policies 64/128/256/512 x samples 1/3/5. Publish every arm descriptively; tuning on these scores invalidates the primary.",
+    "Fig10": "Base/color/shape images of all ten games available for early development switch; 5000-action switch belongs to evaluation.",
+    "Fig11": "Matched perturbation/base reward curves, both conditions, pre/post scores and recovery.",
+    "Fig12": "Explode color change, separately labeled privileged remap versus ordinary identity adaptation; record pre/post slot IDs on the first evaluation seed.",
+    "Alg1": "Analytic threshold, occupancy and full-bank cases; native candidate births pending.",
+    "Alg2": "Two analytic rMM merges, including a rejected merge; candidate generated-buffer replay pending.",
+    "Alg3": "Analytic discounted/undiscounted reversal and novelty; stochastic planner candidate pending.",
+    "later_review": "Version-specific extended 100k and robust aggregate/IQM curves are deferred. Retain arXiv v1 as primary; only use later Appendix B to disambiguate radii."
+  }
+}

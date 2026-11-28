@@ -1,8 +1,8 @@
 ---
 id: car-8rgl
-status: in_progress
+status: closed
 deps: []
-links: [cff-du6m]
+links: [cff-du6m, car-ozw0]
 created: 2026-11-23T21:48:38Z
 type: task
 priority: 2
@@ -44,3 +44,58 @@ First reference checkpoint, pinned release b99f625. Does a soft assignment simpl
 **2026-11-24T01:37:58Z**
 
 Independent additive oracle. Identical active 2D Gaussian priors m=(1,-1), kappa=2, nu=4, psi=((2,1),(1,2)); category priors A=(2,3), B=(1,2,1). Record one: x=(2,0), zero observation covariance, A=0, B missing. Absolute mixed expected log likelihood -4.381065542. Record two: x=(0,0), covariance ((0.5,-0.25),(-0.25,0.5)), A=1, B=1; score -9.047732209. Fixed component weights (1/4,3/4,0) then (1/2,1/2,0) give first and second posterior mean (10,-8)/11 and (14,-8)/13, scales ((262,61),(61,246))/88 and ((362,107),(107,314))/104. Dormant component remains at prior. Independent intercept-only component-MNIW check agreed within 5.6e-7 in float32 and 1.4e-15 in float64. Use with source precision, mask and split-batch tests when work resumes.
+
+**2026-11-24T03:49:54Z**
+
+Completed the MIT Gameworld development tape and reward scorer at 7fa4f796740e0b365d2e0b1e70882265a843a30c on feature/axiom-gameworld-reference. The publishable evidence is under ~/agent-share/axiom-gameworld-reference. Use tapes/manifest.json for the source hashes, game/action seeds, integer action labels and 30 NPZ files. replay.json has every frame hash and the first observed perturbation differences. score.json has each raw-reward total, rolling means and terminal steps. check.json records the independent checks. The manifest SHA-256 is abca225803b4b79801c7fcf2a5823cc639237f12b707f779dea3f3815f3ed376.
+
+Each of the ten games supplied 48 development decisions in its base, color and shape conditions. All 1,440 decisions and 1,473 native RGB frames replayed exactly in a fresh process, including three episode endings followed by explicit resets. A second seeded capture matched all tape array hashes. The simulator and the random policy have independent streams. The private simulator RNG starts before construction. The policy receives an isolated copy of pre-action pixels and the previous real reward, including on a reset after a terminal action. The first observation has no previous reward. The tape preserves the separate terminal and reset frames. For Gold and Hunt the implemented integer action order is left, right, up, down, stay.
+
+The development perturbations switched after action 8. All twenty perturbed runs matched through that step, first changed the returned frame on action 9, and first changed a decision input on action 10. Explode shape changes physical bucket and bomb dimensions in the pinned game. With identical actions its reward first differed at action 46, yielding +2 over 48 steps versus +1 for the base and color runs. The full reference schedule specifies action 5,000. These measurements cover the early development switch only.
+
+The focused checker recomputed raw returns and every eight-step rolling mean independently. The 48-step tapes have no complete 1,000-step window. A 1,001-reward analytic example verified the two consecutive 1,000-step windows and the total separately. Dirac's independent Explode golden matched both reset and first-step frame hashes. The checker also exercised terminal and truncated resets, caller RNG restoration, policy isolation and rejection of changed archives, digests and duplicated runs. This is isolated experiment tooling. No CFFG engine, learner, dependencies, numerical rules, test selection or pass/fail behavior changed. The full suite was outside this gate.
+
+To reproduce from the named worktree, use the private Python 3.11.15 uv project and pinned MIT checkout. The game commit is 85493c477004ecfd3299b0b053884f23d59a5ec5. The overlay/uv.lock SHA-256 is 035d1f9b20a9d490a55f142c644cd27bb2789d03b0806523c1f85d64de720937.
+
+```sh
+root="$HOME/agent-share/axiom-gameworld-reference"
+envrun() { uv run --project "$root/overlay" --frozen --no-sync python -B "$@"; }
+envrun tools/axiom/gameworld_replay.py capture --checkout "$root/gameworld" --archive "$root/fresh-tapes"
+envrun tools/axiom/gameworld_replay.py replay --checkout "$root/gameworld" --archive "$root/fresh-tapes" > "$root/fresh-replay.json"
+envrun tools/axiom/gameworld_replay.py score --archive "$root/fresh-tapes" > "$root/fresh-score.json"
+envrun tools/axiom/gameworld_replay_check.py --checkout "$root/gameworld" --archive "$root/fresh-tapes" --replay "$root/fresh-replay.json" --score "$root/fresh-score.json"
+```
+
+Pending at the parent online-learner accuracy stop: object-state and learner/planner intermediate fixtures, remaining paper/release decisions and tests, the paper result/ablation inventory and the predeclared evaluation seed, margin and failure protocol. The historical agent and held-out campaign were not run. Keep car-8rgl in progress.
+
+**2026-11-24T05:33:27Z**
+
+The prospective reference is ready for spatial and model work at 6871a36 (fixtures) and eba6a0f (design and scorer). car-8rgl stays in progress at Cooper's request. All work here used source inspection, the recorded MIT development archive and small independent examples. Candidate module qualification, pre-evaluation and the scored campaign remain with their implementation owners. No licensed native AXIOM run, source redistribution, new Gameworld episode or scored evaluation run was part of this milestone.
+
+Under ~/agent-share/axiom-gameworld-reference/reference-v1, protocol.json is the portable design, expanded seed inventory and file-hash manifest. Its SHA-256 is ef5141f70e4ef6792a40e7ade7086109fc9e04b68afed19764294f9b53282caf. validation.json records matching regenerated bytes, 13 verified release Git blob IDs, all 60 published Table 1 mean/SD pairs and 48 analytic checks. final-intermediates has an eight-frame original RGB tape, separate scorer labels, all 49 archived base Explode frames' visible-object statistics and checks.json (27755723842ab2910fc5b75584326975a055ce88902cef27b478a595e5033cd1). Earlier development probes remain available under their original paths. The previous 30 environment traces, scores and independent replay have pinned hashes in the new manifest.
+
+For car-kwjj, use reference_cases.json spatial_sweep and slot_growth. Both pixels give equal soft responsibility to the two slots. Their hard winners occupy only slot zero. Ideal posterior means along x are 0.5 and 1.5 with variance 0.5. The release adds a scalar 1e-8 to every precision entry before including the fixed prior. The fixture also gives the adjusted 2D means and off-diagonal covariance. Occupancy and ordinary positive-mass parameter write masks differ. See release b99f625, axiom/models/smm.py lines 323–353, 356–400, 479–505, 532–647, axiom/vi/models/slot_mixture_model.py lines 67–75 and 315–333, and axiom/vi/exponential/mvn.py lines 79–85 and 113–122. Zeroing the small off-diagonal triggers the float64 check. Pixel labels are scorer-only and provide no native slot-posterior measurements.
+
+For car-mps6/car-ne0a, reference_cases.json covers threshold choices, assignment and prior choices, write gates, static versus tracked objects, all four seeded motion modes, distinct novelty/capacity responses, tuned geometry, accepted/rejected reductions, reciprocal-count novelty and a policy ranking reversal. Earlier additive and release-style mixed-statistic examples in this ticket still apply. Dirac independently checked the v1 tables and Figures 1–12 and the release's tuned mode. Appendix B of the later review manuscript resolves the duplicated radius in v1. defaults.py lines 446–483 confirm that temporal projection, feature dimension and neighbor selection also change. Both tuned train/predict radii are set explicitly in v1 of this reference. The historical command line and native traces remain unavailable. Confidence is high for the pinned configuration and analytic cases; empirical model parity still requires qualified candidate output.
+
+The development pilot, twenty pre-evaluation runs and one hundred primary evaluation runs have separate seeds and release gates. The 1,000-step pre-evaluation checks engineering correctness and resume identity. Evaluation pairs models 90101–90110 with separately seeded environments. Matched ablations, perturbations and privileged remapping retain their own labels. Score actual post-action rewards over 10,000 real interactions, including the terminal reward exactly once. Entire-arm comparisons require every assigned run. The practical margin is ±10 raw reward units. The printed historical benchmark and the unpaired two-population uncertainty have separate verdicts. With the published SDs the conservative macro population interval has a minimum half-width above 30 even if all new seeds return the same score. Table/figure coverage and deferred experiments are in reference_protocol.json.
+
+Optional P3 car-ozw0 owns permission and provenance for direct native comparison or original raw histories. This is separate from downstream CFFG development. Existing implementation tickets retain their original dependency edges.
+
+Reproduce in this worktree with a fresh output directory:
+
+```sh
+root="$HOME/agent-share/axiom-gameworld-reference"
+out=$(mktemp -d)
+refpython() { uv run --project "$root/overlay" --frozen --no-sync python -B "$@"; }
+refpython tools/axiom/reference_intermediates.py --archive "$root/tapes" --output "$out/intermediates"
+refpython tools/axiom/reference_protocol.py --archive "$root" --intermediates "$out/intermediates" --output "$out/protocol.json"
+cmp "$root/reference-v1/protocol.json" "$out/protocol.json"
+refpython tools/axiom/reference_protocol_check.py
+```
+
+Validation used the isolated-tooling exception. Only the reference protocol, its scorer and independent fixtures changed. Five focused test groups passed for inventory, uncertainty, failure denominators, paired effects/recovery and corrupted evidence. The raw Gameworld checker and original tapes were reused. Source formatting, diff and ticket cycle checks passed. The architecture change-path review covers fixture serialization and replay. Engine rules, synchronous/scheduled execution, host/compiled numerical behavior, package dependencies and repository suite selection are N/A.
+
+**2026-11-24T06:37:08Z**
+
+Verified the published reference-v1 protocol digest ef5141f7 on the integrated branch. The reference archive qualifies 48 scalar cases and all 60 published score/SD pairs. Scoring now has a frozen inventory. Direct reference-agent output provenance remains tracked separately in car-ozw0.

@@ -418,29 +418,26 @@ the whitened evidence system; this is reported as invalid evidence, not repaired
 by a floor or accepted as a finite posterior. These numerical changes do not
 repair the partial-goal planning limitation above.
 
-Ordinary `gaussian` and `gaussian_linear` declared learners still consume
-raw second moments. In float32, a component centered at 4096 can have a
-variance of 0.25 or 1 and return the same raw second moment in both cases.
-The inferred marginal can retain the variance while the resulting learned
-noise scale loses it. The component-MNIW readout uses raw moments as well.
-The centered readout for `gaussian_mixture` preserves each conditional
-covariance. See the Gaussian learning follow-up `cff-6wpk`.
+Default raw Gaussian statistics can round different conditional variances
+to the same second moment. Declared NIW, ordinary MNIW and component MNIW
+consume centered statistics. MNIW stores a dense coefficient precision.
+Even in float64, two unit-variance predictors both centered at 2²⁷ can
+lose the small variance of their difference in that matrix. The centered update raises a precision error
+before committing it. Center input coordinates at a fixed origin when the
+stored precision would otherwise be unresolved. `cad-1bat` tracks a
+representation that retains this information across checkpoints.
 
-The batched mixed learner stores its posterior in the caller's working
-precision. A well-formed update can round a small mean or count increment
-away when written to float32 state. This matters in long streams. Starting
-at mean 10000 and κ=4096, 1024 identical unit-weight records at 10001
-(conditional variance 0.125) leave the streaming float32 mean at 10000.
-The correct mean is 10000.2. Starting at Ψ=3, the stored scale becomes
-1154.78 rather than 950.2. A single batch or a float64 stream recovers the
-analytic scale on this fixture. Wider storage moves the precision limit. An
-update below half the spacing at the stored mean can also round away in
-float64. Centering the input coordinates at the
-original mean also recovers it to float32 precision. The declared
-`component_niw` family accumulates on the host in float64. The standalone
-mixed learner's `valid` flag checks inputs and posterior propriety. Long-run
-accumulation accuracy needs a separate check; reproduce this case with
-`tools/axiom/mixed_streaming_probe.py`.
+The mixed learner carries a second word for means, counts and Gaussian scale
+in the caller's dtype. In the translated float32 test (1,024 observations at
+10001, starting mean 10000), uninterrupted learning yields a scale of
+950.200012 against 950.2 analytically. Reloading an exact checkpoint after
+every observation reproduces the same state. Reloading the compact format
+each time gives 1154.7771, a 21.53% error. Reloading every 128 observations
+in this case gives 949.9255, a 0.029% error. Saving alone has no effect on
+later updates. Choose exact checkpoints when restart frequency or a future
+decision makes the discarded precision material. Two finite words also
+have a finite range. The declared `component_niw` family uses a separate
+float64 host accumulator.
 
 **S1e. Gaussian parameter learning is EM-rollover; flooding VMP is not
 strictly monotone.** Continuous conjugate learning (cff-7c5o, DERIVATIONS.md

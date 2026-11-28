@@ -104,7 +104,7 @@ def test_partial_goal_limitation_is_not_misrepresented_as_full_horizon_planning(
     assert abs(later.free_energies[-1] - baseline.free_energies[-1]) > 100
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 @pytest.mark.parametrize("schedule", [pytest.param("auto", marks=pytest.mark.slow), "flood"])
 def test_neighboring_noise_and_sparse_actions_have_truthful_results(dtype, schedule):
     with jax.enable_x64(dtype is np.float64):

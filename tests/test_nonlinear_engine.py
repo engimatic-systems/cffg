@@ -9,7 +9,7 @@ from cffg.compiler import compile_template
 from cffg.engine import Engine, RunStatus
 
 
-@pytest.mark.parametrize("method", ["linearization", "sigma_point"])
+@pytest.mark.parametrize("method", [pytest.param("linearization", marks=pytest.mark.slow), "sigma_point"])
 @pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 def test_curved_sensor_fixed_point_and_energy_contract(method, schedule):
     template, arrays = model(method)
@@ -181,6 +181,7 @@ def test_float32_coordinate_units_do_not_invalidate_proper_gaussians(scale):
         np.testing.assert_allclose(covariance / scale ** 2, [[1 / 6]], atol=1e-4)
 
 
+@pytest.mark.slow
 def test_colony_keeps_independent_adaptive_run_certificates():
     from cffg.colony import Colony
 

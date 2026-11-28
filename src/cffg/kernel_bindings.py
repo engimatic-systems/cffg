@@ -162,6 +162,7 @@ class GaussianBinding(ImmutableRecord):
     admission: Callable | None = None
     # Configured Taylor means expose (Jacobian, value) at a live input and parameter row.
     taylor_linearize: Callable | None = None
+    centered_statistics: Callable | None = None
     arena: str = field(default="gaussian", init=False)
 
     @property

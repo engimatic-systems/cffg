@@ -76,7 +76,9 @@ def brute_map(n, cards, priors, feasible):
 # --- (a) Viterbi identity on trees ------------------------------------------
 
 
-@pytest.mark.parametrize("seed", [0, 1, 2, 3, 4])
+@pytest.mark.parametrize(
+    "seed", [pytest.param(seed, marks=pytest.mark.slow if seed >= 2 else ()) for seed in range(5)]
+)
 def test_viterbi_identity_on_tree(seed):
     """Random categorical/matrix_cat tree, max mode: decode == brute-force MAP
     and objective == -log f at the MAP exactly."""
@@ -267,6 +269,7 @@ def _brute_sudoku(givens):
     return sols
 
 
+@pytest.mark.slow
 def test_mini_sudoku_decimation():
     solution = np.array([[0, 1, 2, 3], [2, 3, 0, 1], [1, 0, 3, 2], [3, 2, 1, 0]])
     givens = {(0, 0): 0, (0, 2): 2, (1, 1): 3, (1, 3): 1,
@@ -383,7 +386,9 @@ def test_max_mode_rejects_vmp_and_gaussian():
 # --- (h) bipartite matching exactness (Bayati-Shah-Sharma) ------------------
 
 
-@pytest.mark.parametrize("seed", [0, 1, 2, 3])
+@pytest.mark.parametrize(
+    "seed", [pytest.param(seed, marks=pytest.mark.slow if seed >= 2 else ()) for seed in range(4)]
+)
 def test_bipartite_matching_exact(seed):
     """K_{4,4} with random distinct weights as a mixed model (soft unary weights
     + alldifferent): max-product decode == the optimal assignment (Hungarian)."""

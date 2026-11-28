@@ -167,10 +167,11 @@ def test_public_method_delegates_to_its_focused_owner(monkeypatch, name):
     assert len(args) == len(expected)
     assert all(left is right for left, right in zip(args, expected))
     if name == "gaussian_node_stats":
+        assert callbacks.pop("centered") is False
         assert callbacks.pop("centered_mixtures") is False
         assert engine.gaussian_node_stats(state, centered_mixtures=True) is marker
         assert len(calls) == 2
-        assert calls[1][1] == {**callbacks, "centered_mixtures": True}
+        assert calls[1][1] == {**callbacks, "centered_mixtures": True, "centered": False}
     for callback in callbacks.values():
         assert callback.__self__ is engine
 

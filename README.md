@@ -152,12 +152,13 @@ expose the specialized workflows named in the capability map.
 </details>
 
 <details>
-<summary><code>cffg.core</code> — serialized graph language (29)</summary>
+<summary><code>cffg.core</code> — serialized graph language (31)</summary>
 
 <!-- facade-core:start -->
 `FACTOR_TYPES`, `AgentSpec`, `BeliefBinding`, `BlobRef`, `BoundaryFactorization`,
 `Broadcast`, `Chain`, `ConstraintKind`, `ConstraintSpec`, `Expose`, `FactorSpec`,
-`FactorType`, `FunctionSpec`, `LearnableSpec`, `ModelError`,
+`FactorType`, `FunctionSpec`, `GaussianFilterSpec`, `GaussianPlanSpec`,
+`LearnableSpec`, `ModelError`,
 `MomentMatchingEndpoint`, `MomentProjection`, `PlateSpec`, `PortRole`, `PortSpec`,
 `Template`, `VariableSpec`, `expand_plates`, `plate_observations`,
 `migrate_moment_matching`, `moment_matching`, `moment_matching_endpoint`,
@@ -296,6 +297,12 @@ and covariance are conditional on that component. Apply its responsibility
 once when updating the learner. This preserves small variances even when the
 feature coordinates have a large offset.
 
+Declared NIW and MNIW learners request centered moments automatically.
+For your own regression update, `engine.gaussian_node_stats(state, centered=True)`
+returns the joint (output, input) mean and the distinct covariance blocks
+`cov_yy`, `cov_yx` and `cov_xx`. A fixed observed output needs only `cov_xx`.
+A switching linear factor also returns each component's responsibility.
+
 The common `engine.bfe(state)` accessor reports the graph's declared variational
 ledger; the name does not make every value an exact Bethe evidence identity.
 Interpret it with `engine.objective_contract` and per-factor
@@ -350,12 +357,56 @@ a fixed research workload, not a general environment API. Other modules under
 `cffg.experiments` and `cffg.benchmarks` are derivation, diagnostic, or
 performance artifacts rather than supported newcomer facades.
 
+For explicit stochastic action sequences, `cffg.rollout_planning.sample_action_sequences`
+takes a pure transition function, a read-only parameter snapshot, the current
+belief, a policy batch and a random key. The AXIOM experiment builds candidate
+action sequences with `cffg.experiments.axiom_planning.plan`. Its refit ranks
+sequences by discounted reward and novelty; execution uses the first action
+of the best undiscounted sequence. `SearchSettings(novelty_weight=0.)` runs
+the same search without the count bonus. The reference-budget test uses a
+supplied two-object world model.
+
+The experimental Gameworld loop starts with `initialize_scene` and feeds
+`observe_scene` each new RGB frame, the action actually applied and its
+reward. The agent tracks objects and learns their identities, motions and
+interactions. Its planner queries a read-only snapshot of those learned
+rules. The [fixed-action replay](tools/axiom/scene_replay.py) checks learning
+and restart on shared pixels. The [closed-loop smoke test](tools/axiom/acted_smoke.py)
+lets the model select the actions. Its 24-step Explode run used a reduced
+search budget and received zero reward. Full-game learning curves remain
+open.
+
 ## Continuous, exponential-family, and hybrid models
 
 `lgssm` constructs a linear-Gaussian state-space model with DATA ports for
 conditioning and missing observations. On its tree, Gaussian marginals match
 Kalman/RTS inference and the ledger has the exact negative-log-evidence
 identity. See [examples/linear_gaussian.py](examples/linear_gaussian.py).
+
+For fixed affine control, save a planning template with a
+`cffg.core.GaussianPlanSpec` and a one-transition filter with a
+`cffg.core.GaussianFilterSpec` using `save_bundle`. The two declarations
+name the same ordered state and command coordinates. The filter applies
+`b + B @ applied` and carries the full filtered covariance to the next plan.
+With those two bundles, the same public interface handles a control step and restart.
+
+```python
+from cffg import RollingAgent
+
+agent = RollingAgent.from_gaussian_bundles("plan.cffgz", "filter.cffgz")
+decision = agent.propose({"target": [2.0]})
+applied = [-0.5]  # the command the actuator actually executed
+agent.observe(applied, [0.5], tick=decision.tick)
+agent.checkpoint("controller.npz")
+
+resumed = RollingAgent.from_gaussian_bundles("plan.cffgz", "filter.cffgz")
+resumed.restore("controller.npz")
+```
+
+The sensor argument can be `None` for a missing reading. A failed solve
+raises before advancing the tick. A checkpoint taken after `propose` also
+retains the outstanding decision. The numerical fixture includes both bundle
+declarations. [Gaussian agent fixture](tests/test_gaussian_agent.py)
 
 An exact-tree certificate checks message consistency, not posterior accuracy.
 Choose float64 for tight moment or evidence comparisons, especially with widely
@@ -572,12 +623,21 @@ mask and one integer array per categorical field. Use zero covariance for a
 known point and category index `-1` for a missing field. Scores are absolute
 expected log likelihoods in nats. Set `include_mixing=False` to assign
 components by observed features alone. Inspect the returned validity flag
-before using the result. `MixedBank.state_dict()` and
-`MixedBank.from_state_dict()` round-trip the full posterior at its saved
-precision. For long streams with large coordinate offsets, use float64 for the
-persistent bank or work in local feature coordinates. The float32 update can
-round away each small change to an absolute mean while still returning valid.
-See the streaming checkpoint in `docs/LIMITATIONS.md`.
+before using the result. `bank.state_dict()` saves a compact snapshot of
+the rounded parameters using the existing v2 layout. Saving leaves the live
+learner intact. Reloading with `MixedBank.from_state_dict(snapshot)` starts
+from the saved values with zero rounding remainders. For experiments that
+need to continue exactly across a restart, use `bank.state_dict(exact=True)`.
+The v3 snapshot includes the corrections needed for subsequent updates.
+Resume on the same backend and numerical configuration for exact replay.
+Both snapshot modes occupy a fixed amount of uncompressed storage for a
+given bank shape and precision, regardless of episode count.
+
+`ComponentBank.state_dict()` applies the same compact default to both the reset
+prior and the learned posterior. Both modes save logical IDs, generations and
+occupancy. Pass `exact=True` when later updates or merges must reproduce the
+uninterrupted result. `ComponentBank.from_state_dict(snapshot)` also reads
+exact lifecycle snapshots created before the compact option was introduced.
 
 For fixed-structure parameter sweeps that are not declared learning,
 `set_params` updates named runtime parameters without recompiling. Shapes,

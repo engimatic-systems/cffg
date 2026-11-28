@@ -1,6 +1,6 @@
 ---
 id: car-ne0a
-status: open
+status: closed
 deps: [cff-lquu]
 links: [cff-21vm, cff-pyy9]
 created: 2026-11-23T21:48:38Z
@@ -34,3 +34,21 @@ The separate cff-pyy9 roadmap branches a future decision on a hypothetical obser
 ## Definitions
 
 A proposal is the distribution used to suggest action strings. An elite is a high-scoring candidate used to improve the proposal. Discounting gives less weight to later rewards. A random key makes one stream of draws reproducible.
+
+## Notes
+
+**2026-11-24T05:16:09Z**
+
+Implement independent read-only sampled planning against an enumerable world. Architecture paths: Agent, planning, or hierarchy feature and Runtime numerical or status invariant. Check shared callback, scalar/batched trajectories, explicit RNG and cold/warm planning, checkpointed planner state, masks, invalid settings and reward aggregation in both precisions. CFFG message sweeps, GFE and template/bundle migration do not own this sampled objective. Object-model integration depends on the native pipeline.
+
+**2026-11-24T05:30:00Z**
+
+Release-budget planner probe completed with supplied two-object, three-interaction snapshot: 32×512×3=49,152 imagined steps and zero real steps. CPU float32 compile 0.732 s, one synchronized warmed decision 21.56 ms. Exact synthetic rollout distribution/score and selection checks plus optional no-bonus comparison passed. Live features and model binding belong to car-mps6. Do not extrapolate these numbers to a 32-object, 5,000-interaction bank or game reward. Shared suite pending.
+
+**2026-11-24T06:02:02Z**
+
+Planner qualification covers one compact live rMM/tMM snapshot, relative and absolute scores against a full-bank query, read-only updates, bitwise-matched keys, no-bonus and reversed discounted/undiscounted rankings. A 32-step ×512 strings ×3 draws synthetic two-slot/three-rule case ran once warm in 21.56 ms. A 5,000-slot bank with eight occupied rules and six tracked objects passed a separately qualified H8×16×3 development search; its 384 imagined transitions took 7.16–7.86 ms after setup. Neither measurement is a 10,000-step Gameworld score.
+
+**2026-11-24T07:18:58Z**
+
+The public sampler, search, learned snapshot bridge and acted development checks passed. Exact restart reproduced the plan and next random key before real action 12. All 24 Explode rewards were zero. The aggregate short suite passed 2798 tests at f74543f. Full-game performance and the supported whole-agent continuation stay with car-zieb and cao-lxmq.
