@@ -97,16 +97,21 @@ def pack_gfe(draft, goals, goal_priors, resolved):
     return {a_key: np.stack(la), c_key: np.stack(lc)}
 
 
-def pack_transition_gfe(draft, resolved):
+def pack_transition_gfe(draft, resolved, template):
     group = draft.plan
     ko, ki, ku = group.cards
     sources = {source.factor: resolved[source.blob] for source in draft.arrays.inputs}
     stacked = []
+    changed = {blob for spec in template.learnables.values() if spec.change_hazard is not None
+               for blob in spec.blobs}
     for member in group.members:
         arr = sources[member]
         _expect(member, arr, (ku, ko, ki))
         if group.learned:
-            if not np.all(arr > 0):
+            if template.factors[member].param_blobs["matrices"] in changed:
+                if not (np.isfinite(arr).all() and (arr >= 0).all() and (arr > 0).any(axis=1).all()):
+                    raise CompileError(f"factor {member!r}: invalid changing transition face")
+            elif not np.all(arr > 0):
                 raise CompileError(f"factor {member!r}: Dirichlet counts must be > 0")
             stacked.append(arr)
         else:

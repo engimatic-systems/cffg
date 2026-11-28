@@ -69,10 +69,14 @@ explicit mean-field family and therefore cannot preserve posterior
 correlations between blocks. Use a joint `BeliefBinding` when those
 correlations are load-bearing, accepting its product-size boundary belief.
 
-Factored transition novelty currently uses a full-support Dirichlet prior for
-each selected column. A known impossible outcome in that transition rules out
-this option for the block. Fixed transitions and deterministic product couplings
-can retain structural zeros alongside other blocks that learn.
+The default stationary factored transition-novelty declaration requires full
+support. A changing transition can use a proper Dirichlet on a smaller,
+immutable face. Its raw table and reset counts must agree on exact exclusions.
+Installing counts requires every allowed concentration and its normalized mean to
+remain positive and normal in the target dtype. A float32 subnormal can survive
+storage and still flush to zero in XLA arithmetic. An unrepresentable face
+raises an error. Excluded outcomes retain zero mass. Fixed transitions and
+deterministic product couplings can also retain their structural zeros.
 
 **H5. Planning is finite-horizon inference; policies are factorized.** LAIF's win
 is linear-in-T policy inference, but T must be chosen, and a receding horizon is
@@ -96,14 +100,17 @@ assumptions; it does not prove a local minimum, a global optimum, or correctness
 of the Bethe approximation on a loopy graph. Initialization can therefore still
 select a poor stationary point, as Part II Fig. 9's bimodal win histogram warns.
 
-**H7. Conjugate continual learning has no principled forgetting.** Dirichlet
-counts accumulate forever: the posterior sharpens monotonically, so a
-nonstationary environment (the maze's reward statistics change at trial 500) is
-absorbed ever more slowly. Exponential count decay / power priors fix this in
-practice but are ad hoc — the "true Bayesian" semantics ends where the
-environment stops being stationary. Relatedly, under model misspecification the
-posterior converges confidently to the best wrong answer; the framework cannot
-tell you your model class is wrong (low evidence hints at it; nothing repairs it).
+**H7. Conjugate learning assumes stationarity unless a transition declares a change model.**
+Stationary learners accumulate evidence indefinitely. A transition learnable
+with a reset hazard uses the D1a bounded approximation. It preserves the
+one-event mixture mean and trace of covariance before projecting; repeated
+projection can alter later predictions and raise or lower D1 novelty. An
+inferred transition contributes a fractional-count power likelihood, whose
+normalizer has no hidden-path evidence interpretation. Within one planning
+window the forecast law is frozen. The environment's actual change frequency
+and the behavioral value of this model require independent evaluation.
+More generally, a misspecified model can accumulate high confidence in an
+inaccurate prediction. Low evidence can indicate a poor fit.
 
 **H8. Factors must have tractable local expectations.** Every node needs its
 average energy and entropy contributions computable (closed form, quadrature, or

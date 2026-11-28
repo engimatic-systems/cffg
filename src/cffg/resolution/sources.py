@@ -59,6 +59,10 @@ def resolve_arrays(
         fallbacks = initializer_fallbacks(t)
     needed = {source.blob for source in sources}
     covariance_blobs = {source.blob for source in sources if source.covariance}
+    changing = {
+        blob: owner.name for owner in t.learnables.values()
+        if owner.change_hazard is not None for blob in owner.blobs
+    }
     out: dict[str, np.ndarray] = {}
     for name in sorted(needed):
         path = Path(root) / t.blobs[name].path if root is not None else None
@@ -84,6 +88,8 @@ def resolve_arrays(
                 + (f" at {path}" if path is not None else " (no root directory)")
                 + ", and no init spec"
             )
+        if name in changing and (value.dtype.kind not in "fiu" or np.any(value < 0)):
+            raise CompileError(f"learnable {changing[name]!r}: {name!r} needs real nonnegative entries")
         if name in covariance_blobs:
             from cffg.params import _validate_covariance
 

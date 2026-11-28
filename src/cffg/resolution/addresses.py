@@ -159,9 +159,24 @@ def resolve_learnables(
         # A graph with no sources is normal, not an error: the planning
         # template reads A only through GFE composites, and learns nothing.
         # Statistics come from the perception template, parameters flow back.
+        support = None
+        if spec.change_hazard is not None:
+            if ftype not in ("matrix_cat", "transition_mixture") or spec.family != "dirichlet":
+                raise CompileError(f"learnable {name!r}: change_hazard needs a categorical transition table")
+            if ftype == "matrix_cat" and any(target.form == "counts" for target in targets):
+                raise CompileError(f"learnable {name!r}: change_hazard cannot own goal-observation counts")
+            values = [np.asarray(resolved[blob]) for blob in sorted(shapes)]
+            if any(np.iscomplexobj(value) or not np.isfinite(value).all()
+                   or (value < 0).any() for value in values):
+                raise CompileError(f"learnable {name!r}: transition inputs must be finite and nonnegative")
+            masks = [value > 0 for value in values]
+            axis = 1 if ftype == "transition_mixture" else 0
+            support = masks[0]
+            if not np.all(support.any(axis=axis)) or not all(np.array_equal(mask, support) for mask in masks):
+                raise CompileError(f"learnable {name!r}: incompatible or empty transition support")
         plan = LearnPlan(
             name, spec.family, ftype, shapes, tuple(sources), tuple(targets),
-            spec.semantic_identity,
+            spec.semantic_identity, spec.change_hazard, support,
         )
         try:
             persistent_schema(plan, family)

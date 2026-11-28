@@ -2109,6 +2109,20 @@ members. A filter statistic can therefore update the posterior once and the
 next planning window writes that update to every tied slice without manual
 accumulation.
 
+With a declared `LearnableSpec.change_hazard`, compilation checks the positive
+support of every consumed raw-count and probability blob. The two windows
+must agree on that face and the hazard. Named parameter writes preserve
+the declared face. D1a's bounded carry holds one
+concentration per allowed outcome, plus the immutable reset prior.
+`changing_learning.py` applies the hazard once per physical update of the
+block, including columns with no observed mass. `transition_change.py`
+implements the same mean and total-variance projection on host arrays and on
+JAX columns. A planning window reads the zero-count forecast from committed
+carry. Hypothetical actions supply no statistics. The learned GFE-TM rule and
+its node-local energy consume those forecast concentrations through the
+existing raw-count address. Checkpoints bind the hazard and immutable reset
+prior digest to the owner. Resuming a changing posterior requires that metadata.
+
 The complete host Template, never a fragment or plate, owns `AgentSpec`.
 Several block marginals are an explicit mean-field rolling boundary. Each
 binding cites a neutral boundary marker: a normalized `matrix_cat` of shape

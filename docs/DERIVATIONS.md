@@ -205,8 +205,8 @@ ever need it at hundreds of states × many actions.
 A door that always opened yesterday may be locked today. One surprising
 failure can mean an unlucky outcome under the familiar rule, or a change
 to the rule itself. The probability of the failure under each explanation
-determines how much evidence to keep. This is a proposed extension to
-transition learning. D1 remains the planner's objective.
+determines how much evidence to keep. A transition learnable opts into
+this model with `change_hazard`. D1 remains the planner's objective.
 
 **Event and clock.** Let θ be one column of a named transition table. On
 each physically committed observation boundary for that block, draw an

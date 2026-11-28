@@ -10,6 +10,7 @@ import numpy as np
 from cffg import kernels
 from cffg._immutable import FrozenMap
 from cffg.compiled import NEG, Arena
+from cffg.changing_learning import initial_count_errors
 from cffg.runtime_types import State, _replace
 
 
@@ -69,8 +70,11 @@ class StateLifecycle:
     gaussian_segments: Mapping[str, range] = field(init=False, repr=False)
     gaussian_validators: Mapping[str, Callable] = field(init=False, repr=False)
 
+    changing_count_errors: tuple[tuple[str, str, str], ...] = field(init=False, repr=False)
+
     def __post_init__(self):
         a = self.arena
+        object.__setattr__(self, "changing_count_errors", initial_count_errors(a))
         message_starts = np.asarray(a.message_starts)
         gaussian_starts = np.asarray(a.g_obs_starts)
         object.__setattr__(self, "categorical_segments", FrozenMap({
@@ -103,7 +107,11 @@ class StateLifecycle:
 
     def initial_parameters(self) -> dict[str, jax.Array]:
         """Convert defaults using the precision setting active at this call."""
-        return {name: jnp.asarray(p) for name, p in self.arena.log_params.items()}
+        params = {name: jnp.asarray(p) for name, p in self.arena.log_params.items()}
+        for key, dtype, error in self.changing_count_errors:
+            if params[key].dtype.str == dtype:
+                raise ValueError(error)
+        return params
 
     def init_state(self, params: dict[str, jax.Array]) -> State:
         """Install supplied initial parameters and representation-specific arrays."""

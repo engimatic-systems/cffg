@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from cffg.changing_learning import validate_learning_state
 from cffg.core.learning_identity import check_identity, check_scoped_name
 
 
@@ -63,10 +64,14 @@ class PersistentStateDescriptor:
     parameter_blobs: tuple[tuple[str, tuple[int, ...]], ...]
     targets: tuple[PersistentTarget, ...]
     arrays: tuple[PersistentArray, ...]
+    transition_change: tuple[float, str] | None = None
 
     def to_dict(self) -> dict:
         """Return JSON-native metadata, without references to mutable state."""
-        return json.loads(json.dumps(asdict(self)))
+        record = asdict(self)
+        if self.transition_change is None:
+            del record["transition_change"]
+        return json.loads(json.dumps(record))
 
 
 def _array_name(name: str, role: str, key: str) -> str:
@@ -149,7 +154,7 @@ def resolve_persistent_state(plan, family, prior, posterior) -> PersistentStateD
                 value.shape, value.dtype.str, _digest(value),
             ))
         try:
-            family.validate_prior(plan.name, state, plan.shapes)
+            validate_learning_state(plan, family, state)
         except (ValueError, TypeError) as error:
             raise ValueError(f"learnable {plan.name!r}: invalid {role}: {error}") from error
     return PersistentStateDescriptor(
@@ -158,6 +163,7 @@ def resolve_persistent_state(plan, family, prior, posterior) -> PersistentStateD
         tuple(sorted({PersistentTarget(
             t.blob, t.role, t.form, t.layout, t.transform, t.factor
         ) for t in plan.targets})), tuple(arrays),
+        (plan.change_hazard, _digest(prior["alpha"])) if plan.change_hazard is not None else None,
     )
 
 
@@ -203,7 +209,7 @@ def validate_persistent_manifest(value, descriptors, *, exact: bool = True) -> d
 
     Destination priors and floating dtypes may differ. Each incoming array is
     validated against its recorded dtype/digest and the family's required shape.
-    The descriptor's prior rows are inventory only in a posterior checkpoint.
+    A changing transition also binds the immutable reset prior's digest.
     With ``exact=False``, complete descriptors may name a subset of owners.
     """
     encoded = np.asarray(value)
