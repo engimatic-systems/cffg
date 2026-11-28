@@ -13,12 +13,14 @@ LEARNING_IDENTITIES = MappingProxyType({
     "niw": "cffg.learning.niw/1.0.0",
     "component_niw": "cffg.learning.component-niw/1.0.0",
     "mniw": "cffg.learning.mniw/1.0.0",
+    "sqrt_mniw": "cffg.learning.sqrt-mniw/1.0.0",
+    "component_sqrt_mniw": "cffg.learning.component-sqrt-mniw/1.0.0",
     "component_mniw": "cffg.learning.component-mniw/1.0.0",
     "pg_weights": "cffg.recurrence.d9-structured-pair/1.0.0",
 })
 
 LEGACY_IDENTITIES = MappingProxyType({
-    key: value for key, value in LEARNING_IDENTITIES.items() if key != "pg_weights"
+    key: value for key, value in LEARNING_IDENTITIES.items() if key not in {"pg_weights", "sqrt_mniw", "component_sqrt_mniw"}
 })
 
 
@@ -44,7 +46,9 @@ def check_identity(name: str, identity: str) -> None:
 def declaration_identity(name: str, family: str, spec: dict, version) -> str:
     """Migrate only historically unchanged declarations; never infer D9 evidence."""
     if version is None and "semantic_identity" not in spec:
-        if family not in LEGACY_IDENTITIES:
+        if family not in LEGACY_IDENTITIES and family != "pg_weights":
+            raise ValueError(f"learnable {name!r}: unversioned {family!r} declaration has no safe semantic migration")
+        if family == "pg_weights":
             raise ValueError(
                 f"learnable {name!r}: unversioned {family!r} declaration has no "
                 "safe semantic migration; unidentified recurrence may contain D8 "

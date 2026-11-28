@@ -22,6 +22,7 @@ _EXPORTS = {
     "HostileInputs": "kernels",
     "LoadedBundle": "bundle",
     "MNIW": "conj",
+    "SquareRootMNIW": "conj",
     "MeanImplementation": "mean_functions",
     "NIW": "conj",
     "NeuralTrainer": "training",

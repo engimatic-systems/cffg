@@ -5,6 +5,7 @@ from operator import index
 import numpy as np
 
 from cffg import ef
+from cffg._column_precision import scaled_root
 
 
 def _sample_shape(shape):
@@ -36,12 +37,12 @@ def _scale_factor(name, value, dim):
         raise ValueError(f"{name} must be finite and positive definite at stored precision") from exc
 
 
-def sample_joint(key, sample_shape, center, psi, nu, *, column_precision=None, kappa=None):
+def sample_joint(key, sample_shape, center, psi, nu, *, column_precision=None, column_root=None, kappa=None):
     from jax import random
 
     shape = _sample_shape(sample_shape)
     center = np.asarray(center)
-    regression = column_precision is not None
+    regression = column_precision is not None or column_root is not None
     if center.ndim != (2 if regression else 1) or 0 in center.shape:
         raise ValueError("posterior location has the wrong shape")
     if center.dtype.kind not in "fiu" or not np.isfinite(center).all():
@@ -52,7 +53,11 @@ def sample_joint(key, sample_shape, center, psi, nu, *, column_precision=None, k
         raise ValueError("nu must exceed output dimension minus one")
     row_chol, row_scale = _scale_factor("psi", psi, d)
     dtype = np.result_type(center.dtype, psi.dtype)
-    if regression:
+    if column_root is not None:
+        root, col_scale = scaled_root(column_root, center.shape[1])
+        col_chol = root.T
+        dtype = np.result_type(dtype, column_root.dtype)
+    elif regression:
         col_chol, col_scale = _scale_factor("lam", column_precision, center.shape[1])
         dtype = np.result_type(dtype, column_precision.dtype)
     else:

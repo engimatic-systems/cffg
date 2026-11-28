@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from cffg import ef
+from cffg._column_precision import dense_precision, scaled_root
 from cffg._conj_sampling import sample_joint as _sample_joint
 
 
@@ -212,8 +213,95 @@ class NIW:
         return _sample_joint(key, sample_shape, self.mu, self.psi, self.nu, kappa=self.kappa)
 
 
+class _RegressionPosterior:
+    def update_centered(self, means, covariances, weights):
+        """Fold weighted conditional moments without subtracting raw second moments.
+
+        The augmented design D contains the prior column-precision root, then
+        the mean and covariance-root rows of each observation scaled by sqrt(w).
+        Regress the residual E relative to the prior coefficients on D. If the
+        fitted increment is T, the posterior precision is D.T @ D and its noise
+        scale is Psi + (E - D @ T).T @ (E - D @ T).
+        """
+        means, covariances, weights = map(np.asarray, (means, covariances, weights))
+        dy, augmented = self.m.shape
+        dimension = dy + augmented - 1
+        if (means.ndim != 2 or means.shape[-1] != dimension
+                or covariances.shape != (len(means), dimension, dimension)
+                or weights.shape != (len(means),)):
+            raise ValueError("incompatible centered regression statistic shapes")
+        if any(a.dtype.kind not in "buif" for a in (means, covariances, weights)):
+            raise ValueError("centered regression statistics must be real")
+        if not np.isfinite(weights).all() or np.any(weights < 0):
+            raise ValueError("regression weights must be finite and nonnegative")
+        active = weights > 0
+        if not active.any():
+            return self
+        if not active.all():
+            means, covariances, weights = means[active], covariances[active], weights[active]
+        means = np.asarray(means, dtype=np.float64)
+        weights = np.asarray(weights, dtype=np.float64)
+        if not np.isfinite(means).all():
+            raise ValueError("positive-weight joint means must be finite")
+        root = _conditional_covariances(covariances, root=True)
+
+        matrix, offset = np.asarray(self.m, dtype=np.float64)[:, :-1], self.m[:, -1]
+        y, x = means[:, :dy], means[:, dy:]
+        mass = np.sqrt(weights)[:, None]
+        design = [self._prior_root(),
+                  mass * np.column_stack((x, np.ones(len(x))))]
+        residual = [np.zeros((augmented, dy)), mass * ((y - offset) - x @ matrix.T)]
+        if root.any():
+            # Every column of the joint root contributes a paired x/y deviation.
+            deviations = (mass[:, None, :] * root).swapaxes(1, 2).reshape(-1, dimension)
+            xdev = deviations[:, dy:]
+            design.append(np.column_stack((xdev, np.zeros(len(xdev)))))
+            residual.append(deviations[:, :dy] - xdev @ matrix.T)
+        design, residual = np.vstack(design), np.vstack(residual)
+        if not np.isfinite(design).all() or not np.isfinite(residual).all():
+            raise ValueError("regression design and residual must be finite")
+        if isinstance(self, SquareRootMNIW):
+            # Order both sides of the least-squares problem. Mixing the large
+            # rows first preserves small predictor contrasts in translated designs.
+            order = np.argsort(-np.max(np.abs(design), axis=1), kind="stable")
+            design, residual = design[order], residual[order]
+        q, r = np.linalg.qr(design, mode="reduced")
+        increment = np.linalg.solve(r, q.T @ residual)
+        error = residual - design @ increment
+        m = self.m + increment.T
+        psi, nu = self.psi + error.T @ error, float(self.nu) + weights.sum()
+        if isinstance(self, SquareRootMNIW):
+            root = np.where((np.diag(r) < 0)[:, None], -r, r)
+            return SquareRootMNIW(m, root, psi, nu)
+        lam = design.T @ design
+        if not all(np.isfinite(a).all() for a in (m, lam, psi, nu)):
+            raise ValueError("regression posterior must be finite")
+        # A well-posed QR fit can lose a direction when its dense precision
+        # is rounded for the next update. Check the actual stored arrays.
+        for name, matrix in (("column precision", lam), ("noise scale", psi)):
+            if len(matrix) > 1:
+                try:
+                    with np.errstate(over="raise", invalid="raise", divide="raise"):
+                        ef.resolved_correlation(matrix)
+                except (FloatingPointError, np.linalg.LinAlgError):
+                    raise ValueError(f"MNIW {name} unresolved at stored precision") from None
+        return replace(self, m=m, lam=lam, psi=psi, nu=nu)
+
+    def rollover(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(A, b, cov) for the next trial's gaussian_linear params;
+        cov = E[W]⁻¹ = Ψ/ν (D4.1.3)."""
+        return self.m[:, :-1].copy(), self.m[:, -1].copy(), self.psi / self.nu
+
+    def mean_cov(self) -> np.ndarray:
+        """Posterior-mean noise covariance Ψ/(ν−d−1), as in D4.1.3."""
+        dimension = self.psi.shape[0]
+        if self.nu <= dimension + 1:
+            raise ValueError("posterior-mean covariance undefined for nu <= d+1")
+        return self.psi / (self.nu - dimension - 1)
+
+
 @dataclass(frozen=True)
-class MNIW:
+class MNIW(_RegressionPosterior):
     """Matrix-normal-inverse-Wishart over a gaussian_linear node's
     ([A b], V), with x̃ = [x; 1] absorbing the offset."""
 
@@ -249,81 +337,8 @@ class MNIW:
             nu=self.nu + n,
         )
 
-    def update_centered(self, means, covariances, weights) -> "MNIW":
-        """Fold weighted conditional moments without subtracting raw second moments.
-
-        The augmented design D contains the prior column-precision root, then
-        the mean and covariance-root rows of each observation scaled by sqrt(w).
-        Regress the residual E relative to the prior coefficients on D. If the
-        fitted increment is T, the posterior precision is D.T @ D and its noise
-        scale is Psi + (E - D @ T).T @ (E - D @ T).
-        """
-        means, covariances, weights = map(np.asarray, (means, covariances, weights))
-        dy, augmented = self.m.shape
-        dimension = dy + augmented - 1
-        if (means.ndim != 2 or means.shape[-1] != dimension
-                or covariances.shape != (len(means), dimension, dimension)
-                or weights.shape != (len(means),)):
-            raise ValueError("incompatible centered regression statistic shapes")
-        if any(a.dtype.kind not in "buif" for a in (means, covariances, weights)):
-            raise ValueError("centered regression statistics must be real")
-        if not np.isfinite(weights).all() or np.any(weights < 0):
-            raise ValueError("regression weights must be finite and nonnegative")
-        active = weights > 0
-        if not active.any():
-            return self
-        if not active.all():
-            means, covariances, weights = means[active], covariances[active], weights[active]
-        means = np.asarray(means, dtype=np.float64)
-        weights = np.asarray(weights, dtype=np.float64)
-        if not np.isfinite(means).all():
-            raise ValueError("positive-weight joint means must be finite")
-        root = _conditional_covariances(covariances, root=True)
-
-        matrix, offset = np.asarray(self.m, dtype=np.float64)[:, :-1], self.m[:, -1]
-        y, x = means[:, :dy], means[:, dy:]
-        mass = np.sqrt(weights)[:, None]
-        design = [np.linalg.cholesky(np.asarray(self.lam, dtype=np.float64)).T,
-                  mass * np.column_stack((x, np.ones(len(x))))]
-        residual = [np.zeros((augmented, dy)), mass * ((y - offset) - x @ matrix.T)]
-        if root.any():
-            # Every column of the joint root contributes a paired x/y deviation.
-            deviations = (mass[:, None, :] * root).swapaxes(1, 2).reshape(-1, dimension)
-            xdev = deviations[:, dy:]
-            design.append(np.column_stack((xdev, np.zeros(len(xdev)))))
-            residual.append(deviations[:, :dy] - xdev @ matrix.T)
-        design, residual = np.vstack(design), np.vstack(residual)
-        if not np.isfinite(design).all() or not np.isfinite(residual).all():
-            raise ValueError("regression design and residual must be finite")
-        q, r = np.linalg.qr(design, mode="reduced")
-        increment = np.linalg.solve(r, q.T @ residual)
-        error = residual - design @ increment
-        m, lam = self.m + increment.T, design.T @ design
-        psi, nu = self.psi + error.T @ error, float(self.nu) + weights.sum()
-        if not all(np.isfinite(a).all() for a in (m, lam, psi, nu)):
-            raise ValueError("regression posterior must be finite")
-        # A well-posed QR fit can lose a direction when its dense precision
-        # is rounded for the next update. Check the actual stored arrays.
-        for name, matrix in (("column precision", lam), ("noise scale", psi)):
-            if len(matrix) > 1:
-                try:
-                    with np.errstate(over="raise", invalid="raise", divide="raise"):
-                        ef.resolved_correlation(matrix)
-                except (FloatingPointError, np.linalg.LinAlgError):
-                    raise ValueError(f"MNIW {name} unresolved at stored precision") from None
-        return replace(self, m=m, lam=lam, psi=psi, nu=nu)
-
-    def rollover(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """(A, b, cov) for the next trial's gaussian_linear params;
-        cov = E[W]⁻¹ = Ψ/ν (D4.1.3)."""
-        return self.m[:, :-1].copy(), self.m[:, -1].copy(), self.psi / self.nu
-
-    def mean_cov(self) -> np.ndarray:
-        """Posterior-mean noise covariance Ψ/(ν−d−1), as in D4.1.3."""
-        dimension = self.psi.shape[0]
-        if self.nu <= dimension + 1:
-            raise ValueError("posterior-mean covariance undefined for nu <= d+1")
-        return self.psi / (self.nu - dimension - 1)
+    def _prior_root(self):
+        return np.linalg.cholesky(np.asarray(self.lam, dtype=np.float64)).T
 
     def sample(self, key, sample_shape=()) -> tuple[np.ndarray, np.ndarray]:
         """Draw (regression matrix including offset, noise covariance) on the host.
@@ -334,6 +349,148 @@ class MNIW:
         with center m, row covariance Sigma and column covariance inv(lam).
         """
         return _sample_joint(key, sample_shape, self.m, self.psi, self.nu, column_precision=self.lam)
+
+
+@dataclass(frozen=True)
+class SquareRootMNIW(_RegressionPosterior):
+    """Opt-in regression posterior with column precision R.T @ R.
+
+    The canonical upper root is authoritative, including across checkpoints.
+    The dense lam accessor checks that materializing the Gram preserves its
+    quadratic forms. update_centered accepts the same records as MNIW.
+    """
+
+    m: np.ndarray
+    lam_root: np.ndarray
+    psi: np.ndarray
+    nu: float
+
+    def __post_init__(self):
+        m, root, psi = (np.asarray(a) for a in (self.m, self.lam_root, self.psi))
+        if (
+            m.ndim != 2
+            or 0 in m.shape
+            or m.dtype not in (np.float32, np.float64)
+            or not np.isfinite(m).all()
+        ):
+            raise ValueError("MNIW center must be a finite floating matrix")
+        scaled_root(root, m.shape[1])
+        if psi.shape != (m.shape[0], m.shape[0]) or psi.dtype not in (
+            np.float32,
+            np.float64,
+        ):
+            raise ValueError(
+                "MNIW noise scale must be a floating matrix matching the output dimension"
+            )
+        try:
+            with np.errstate(over="raise", invalid="raise", divide="raise"):
+                ef.resolved_correlation(psi)
+        except (FloatingPointError, np.linalg.LinAlgError):
+            raise ValueError(
+                "MNIW noise scale unresolved at stored precision"
+            ) from None
+        degrees = np.asarray(self.nu)
+        if (
+            degrees.ndim
+            or degrees.dtype.kind not in "fiu"
+            or not np.isfinite(degrees)
+            or degrees <= m.shape[0] - 1
+        ):
+            raise ValueError("improper MNIW degrees of freedom")
+        object.__setattr__(self, "nu", degrees[()])
+        for name, array in (("m", m), ("lam_root", root), ("psi", psi)):
+            owned = array.copy()
+            owned.setflags(write=False)
+            object.__setattr__(self, name, owned)
+
+    @classmethod
+    def from_dense(cls, prior: MNIW):
+        """Convert the information present in a resolved dense posterior."""
+        try:
+            with np.errstate(over="raise", invalid="raise", divide="raise"):
+                correlation, scale = ef.resolved_correlation(prior.lam)
+                root = np.linalg.cholesky(correlation).T * scale
+        except (FloatingPointError, np.linalg.LinAlgError):
+            raise ValueError(
+                "legacy column precision unresolved at stored precision"
+            ) from None
+        return cls(prior.m, root, prior.psi, prior.nu)
+
+    @property
+    def lam(self):
+        return dense_precision(self.lam_root)
+
+    def _prior_root(self):
+        return self.lam_root.astype(np.float64, copy=False)
+
+    def precision_quadratic(self, vector):
+        """Evaluate v.T @ Lambda @ v for a vector or a batch of row vectors."""
+        v = np.asarray(vector)
+        if (
+            not v.ndim
+            or v.shape[-1] != self.m.shape[1]
+            or v.dtype.kind not in "iuf"
+            or not np.isfinite(v).all()
+        ):
+            raise ValueError("invalid column precision vector")
+        with np.errstate(over="raise", invalid="raise"):
+            product = v @ self._prior_root().T
+            result = np.sum(product * product, axis=-1)
+        if not np.isfinite(result).all():
+            raise FloatingPointError(
+                "column precision quadratic is outside the working dtype"
+            )
+        return result
+
+    def solve_precision(self, rhs):
+        """Solve Lambda @ x = rhs for one or more right-hand sides."""
+        rhs = np.asarray(rhs)
+        if (
+            rhs.ndim not in (1, 2)
+            or rhs.shape[0] != self.m.shape[1]
+            or rhs.dtype.kind not in "iuf"
+            or not np.isfinite(rhs).all()
+        ):
+            raise ValueError("invalid column precision right-hand side")
+        r, scale = scaled_root(self.lam_root, self.m.shape[1])
+        if rhs.ndim == 2:
+            scale = scale[:, None]
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            result = np.linalg.solve(r, np.linalg.solve(r.T, rhs / scale)) / scale
+        if not np.isfinite(result).all():
+            raise FloatingPointError(
+                "column precision solution is outside the working dtype"
+            )
+        return result
+
+    def update(self, syy, syx, sxx, n):
+        """Use legacy raw statistics only when their dense update is representable."""
+        dy, p = self.m.shape
+        blocks = tuple(np.asarray(x) for x in (syy, syx, sxx))
+        if tuple(x.shape for x in blocks) != ((dy, dy), (dy, p), (p, p)):
+            raise ValueError("incompatible raw regression statistic shapes")
+        if any(x.dtype.kind not in "fiu" or not np.isfinite(x).all() for x in blocks):
+            raise ValueError("raw regression statistics must be real and finite")
+        count = np.asarray(n)
+        if (
+            count.ndim
+            or count.dtype.kind not in "fiu"
+            or not np.isfinite(count)
+            or count < 0
+        ):
+            raise ValueError("regression count must be finite and nonnegative")
+        if count == 0:
+            if any(np.any(x != 0) for x in blocks):
+                raise ValueError("zero-weight regression has nonzero raw statistics")
+            return self
+        before = MNIW(self.m, self.lam, self.psi, self.nu)
+        return type(self).from_dense(before.update(*blocks, float(count)))
+
+    def sample(self, key, sample_shape=()):
+        """Draw the matrix and covariance directly from the stored root."""
+        return _sample_joint(
+            key, sample_shape, self.m, self.psi, self.nu, column_root=self.lam_root
+        )
 
 
 def _numpy_symmetry_ok(matrices: np.ndarray) -> np.ndarray:

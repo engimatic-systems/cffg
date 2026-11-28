@@ -615,6 +615,24 @@ the joint covariance is singular. A fixed observed output has zero deviation.
 `test_centered_mniw_correlated_rows_match_independent_raw_oracle` checks
 this expression against direct integration on a translated example.
 
+**Square-root column precision.** Let `P` permute the rows of the design in
+decreasing order of maximum absolute entry. A thin QR of `P D = Q R`, with
+the same permutation applied to `E`, gives the same least-squares problem
+and `Λn = Rᵀ R`. Choose positive diagonal signs on the stored upper root
+after solving for the coefficients. The next trial stacks this root as its
+prior design. For a contrast `v`, its precision is `‖Rv‖²`. A conditional
+matrix-normal draw uses column noise `Z R⁻ᵀ` for iid standard-normal
+entries of `Z`. Both operations avoid rounding the dense Gram.
+
+For two predictors with identical mean `c`, unit joint covariance and an
+identity prior, one occurrence adds one unit of within-observation
+precision per predictor, plus the outer product of `[c,c,1]`. The latter
+contributes zero on `v=[1,−1,0]`. Its precision is therefore 4 after one
+update and 6 after two. At `c=2²⁷` the correctly rounded float64 values of
+`c²` and `c²+2` coincide. The independent rational fixture checks this
+contrast, its inverse-precision form, the fitted nonzero coefficients and
+noise scale, including a reversed input center. [Executable checks](../tests/test_square_root_mniw.py)
+
 **Joint NIW and MNIW draws.** To simulate a possible model, first draw its
 noise covariance. Conditional uncertainty about the mean or coefficients
 inherits that same noise scale. Let `L Lᵀ = Ψ`. Construct a lower triangular

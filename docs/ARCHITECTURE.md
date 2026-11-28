@@ -1885,6 +1885,18 @@ them. Four rules define the contract:
    outside JIT; inference in the next run consumes point parameters rather
    than joint parameter uncertainty.
 
+   Declared `sqrt_mniw` and `component_sqrt_mniw` use the same centered
+   Gaussian readouts and point rollovers. Each has its own family identity
+   and stores the canonical upper QR root under `lam_root` with the same
+   square shape as a dense column precision. Root validation equilibrates
+   the columns and checks numerical rank at the root's stored dtype. The
+   centered fold fits in float64 and retains a float64 root. Dense readout
+   checks the rounded Gram in correlation units and tests its Cholesky
+   factor against the original root. The relative quadratic-form error
+   budget is the square root of the stored dtype epsilon. Joint sampling
+   solves with that root. The standard rSLDS model uses its original dense
+   families.
+
 Cadence is deliberately not part of `LearnableSpec`. `Learnables` keeps a
 read-only validated copy of every initial prior. `accumulate(engine, result)`
 starts from the current posterior and adds a distinct trial;
