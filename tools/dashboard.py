@@ -118,6 +118,7 @@ EPIC_FILES = {
         "test_constraint_flip.py",
         "test_colony.py",
         "test_structure_scoring.py",
+        "test_structure_search.py",
         "test_public_api.py",
         "test_runtime_status.py",
     ],

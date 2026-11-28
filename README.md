@@ -949,6 +949,46 @@ raw totals keep their original values. Loopy models carry an approximation
 notice. A planning graph with goal ports or P-substitution needs a separate
 ordinary evaluation graph. Use `grouped=False` for the single-Engine path.
 
+### Decide when to try a different model
+
+A search round tests a specific change to the current model. For example,
+suppose a model has three hidden room types. You suspect it could explain
+the same readings with two. Fit both versions on the same training records,
+then ask which one better predicts a separate set of readings. A tie lets
+you keep the current model.
+
+```python
+from cffg.structure_operators import PruneState
+from cffg.structure_search import search_round
+
+models = {"rooms": (template, fitted_arrays)}
+result = search_round("rooms", models, [PruneState("place", 2)], fit, heldout)
+for key, row in result.scores.items():
+    print(key, row.status, row.total_bfe, row.rank)
+print(result.reason, result.selected_id)
+```
+
+Each proposal records its parent and its edits. `result.failures` lists edits
+that could not produce a candidate. A model that ran and failed inference
+has its own status in `result.scores`. A unique best challenger wins. The
+incumbent wins a tie for first. Tied challengers ahead of the incumbent, or
+a round with no usable scores, leave `selected_id` empty.
+
+To request a round only after repeated poor predictions, keep one
+`trigger = ProposalTrigger(threshold=3.0, consecutive=2)` from
+`cffg.structure_search`. Call `trigger.observe(score)` once per completed
+monitoring evaluation of the incumbent. It returns true on the second
+consecutive total above three nats. Changing the model, recovering to the
+threshold or below, or failing inference resets the count. Use comparable
+amounts of data per evaluation since the threshold applies to a sum.
+
+An external proposer can use `source_candidate("rooms", models)` to get the
+incumbent's record, then pass a `StructuralCandidate` identifying that parent
+alongside the built-in edits. Keep the selected record, its numeric inputs,
+and all referenced models. For another round, replay that record, register
+the resulting source under a new key, and supply the record as `incumbent`.
+Keep the training data and priors to reproduce a fitted score.
+
 ## Batch, extend, render, and estimate
 
 `cffg.colony.Colony` caches one engine per structure hash and vmaps matching

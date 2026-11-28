@@ -2377,6 +2377,17 @@ schedule and hardening budget. Both preserve the underlying ledger. Only
 complete, finite ordinary Bethe results enter the ranking. Loops carry an
 explicit approximation notice. Template and checkpoint formats are unchanged.
 
+`structure_search.search_round` checks that each child names the current
+incumbent and starts from its retained graph and numeric values. Built-in
+operations and external edit records enter the same replay and scoring path.
+Selection reads the ranks produced by the ordinary scorer. A failed edit
+retains its proposal index and reason. A failed model run retains its status.
+`ProposalTrigger` counts consecutive completed monitoring totals above a
+caller-supplied threshold and fires once per streak. An acting D5 composite
+may select the measurement before a round. Its policy score belongs to the
+acting graph. Each candidate scores the recorded measurement through its
+own ordinary observation model.
+
 ### 5b. Colony execution (many small graphs, one machine)
 
 `Colony` owns an instance table of `(structure_hash, State)` pairs and caches one
