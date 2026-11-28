@@ -25,6 +25,7 @@ from urllib.parse import quote
 
 import numpy as np
 
+from cffg.array_identity import array_descriptor
 from cffg.core.ir import Template
 from cffg.core.plates import PLATE_INDEX_TOKEN, expand_plates
 from cffg.core.serialize import (
@@ -141,11 +142,6 @@ def _npy(value):
     return buffer.getvalue()
 
 
-def _array_descriptor(value):
-    return {"shape": list(value.shape), "dtype": value.dtype.str,
-            "sha256": hashlib.sha256(value.tobytes(order="C")).hexdigest()}
-
-
 def _point_arrays(template, arrays):
     expected = set(template.blobs)
     if set(arrays) != expected:
@@ -170,7 +166,7 @@ def _learning_snapshot(learning):
         for row in descriptor.arrays:
             state = learning.initial_params if row.role == "prior" else learning.params
             value = np.asarray(state[descriptor.name][row.key]).copy()
-            if _array_descriptor(value) != {
+            if array_descriptor(value) != {
                 "shape": list(row.shape), "dtype": row.dtype, "sha256": row.sha256,
             }:
                 raise BundleError("learning state changed while taking its snapshot")
@@ -211,7 +207,7 @@ def save_bundle(
         "structure_hash": structure_hash(bundled),
         "blob_sha256": {name: hashlib.sha256(raw).hexdigest() for name, raw in raw_blobs.items()},
         "blob_paths": blob_paths,
-        "blob_arrays": {name: _array_descriptor(value) for name, value in arrays.items()},
+        "blob_arrays": {name: array_descriptor(value) for name, value in arrays.items()},
         "learning": learning,
         "created": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "generator": "cffg",
@@ -372,7 +368,7 @@ def _load_archive(archive):
             raise BundleError(f"blob {name!r} sha256 mismatch")
         arrays[name] = _read_array(archive, member)
     _point_arrays(expanded, arrays)
-    if manifest.get("blob_arrays") != {name: _array_descriptor(value) for name, value in arrays.items()}:
+    if manifest.get("blob_arrays") != {name: array_descriptor(value) for name, value in arrays.items()}:
         raise BundleError("point array shape, dtype or value digest mismatch")
     learning_members = set()
     inventory = manifest["learning"]
