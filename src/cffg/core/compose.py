@@ -133,6 +133,9 @@ def _check_union(a: Template, b: Template) -> bool:
     if a.plates or b.plates:
         from cffg.core.plates import _with_shared_owners
 
+        for template in (a, b):
+            if any(spec.fragment.plates for spec in template.plates.values()):
+                validate(template)
         a, b = _with_shared_owners(a), _with_shared_owners(b)
     left, right = set(), set()
     for kind in ("variables", "factors", "ports", "blobs", "learnables", "plates"):

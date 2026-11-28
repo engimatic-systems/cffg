@@ -15,7 +15,6 @@ from cffg.core import (
     BlobRef,
     Expose,
     FactorSpec,
-    ModelError,
     PlateSpec,
     PortRole,
     PortSpec,
@@ -431,12 +430,9 @@ def test_current_plate_bundle_requires_blob_paths(tmp_path):
         load_bundle(path)
 
 
-def test_save_rejects_nested_plate_before_creating_destination(tmp_path):
+def test_nested_plate_requires_scoped_arrays_before_creating_destination(tmp_path):
     path = tmp_path / "nested.cffgz"
-    with pytest.raises(
-        ModelError,
-        match=r"plate 'outer': fragment declares nested plates \['leaf'\]",
-    ):
+    with pytest.raises(BundleError, match="arrays missing for blobs"):
         save_bundle(path, _nested_plate_model(), {})
     assert not path.exists()
 
@@ -454,13 +450,7 @@ def test_load_rejects_hand_built_nested_plate_bundle(tmp_path):
         zf.writestr("model.json", to_json(template))
         zf.writestr("manifest.json", json.dumps(manifest))
 
-    with pytest.raises(
-        BundleError,
-        match=(
-            r"invalid bundled plate structure:[\s\S]*plate 'outer': fragment "
-            r"declares nested plates \['leaf'\]"
-        ),
-    ):
+    with pytest.raises(BundleError, match="blob inventory mismatch"):
         load_bundle(path)
 
 

@@ -335,30 +335,90 @@ def test_plate_observations_1d_and_2d():
 # Validation of the SPEC
 
 
-def test_reject_3d_dims():
+def test_accept_nd_dims():
     host = Template(name="g", plates={"p": PlateSpec(pixel_fragment(), (2, 2, 2), (Expose(),))})
-    with pytest.raises(ModelError, match="1-D or 2-D"):
-        validate(host)
+    validate(host)
 
 
-def test_reject_plate_nested_inside_fragment_before_grounding():
+def test_nested_references_resolve_surviving_ports_and_hubs(hmm_slice):
     middle = Template(
         name="middle",
-        plates={"inner": PlateSpec(pixel_fragment(), (2,), (Expose(),))},
+        plates={"inner": PlateSpec(hmm_slice, (3,), (
+            Chain("tail", "head"), Broadcast("sense", "sensors"), Expose(),
+        ))},
     )
     host = Template(
         name="host",
-        plates={"outer": PlateSpec(middle, (2,), (Expose(),))},
+        plates={"outer": PlateSpec(middle, (2, 1, 2), (
+            Chain("inner/2/tail", "inner/0/head", axis=2),
+            Broadcast("inner/sensors", "all_sensors"),
+        ))},
     )
-    message = (
-        r"plate 'outer': fragment declares nested plates \['inner'\]; "
-        r"nested plate grounding is not supported in phase 1"
-    )
+    validate(host)
 
-    with pytest.raises(ModelError, match=message):
-        validate(host)
-    with pytest.raises(ModelError, match=message):
+    failures = {
+        "inner/1/head": "consumed by a Chain",
+        "inner/0/tail": "consumed by a Chain",
+        "inner/0/sense": "consumed by a Broadcast",
+        "inner/3/head": "outside plate dims",
+        "inner/00/head": "canonical integer",
+    }
+    for port, message in failures.items():
+        host.plates["outer"] = PlateSpec(middle, (2,), (Broadcast(port, "hub"),))
+        with pytest.raises(ModelError, match=message):
+            validate(host)
+
+
+def test_nested_coordinate_bounds_on_each_axis(hmm_slice):
+    middle = Template(name="middle", plates={"inner": PlateSpec(hmm_slice, (3, 2, 4))})
+    host = Template(name="host", plates={"outer": PlateSpec(middle, (2,), (
+        Chain("inner/2/1/3/tail", "inner/0/0/0/head"),
+    ))})
+    validate(host)
+    for coordinate in ("3/1/3", "2/2/3", "2/1/4", "-1/0/0"):
+        host.plates["outer"] = PlateSpec(middle, (2,), (
+            Chain(f"inner/{coordinate}/tail", "inner/0/0/0/head"),
+        ))
+        with pytest.raises(ModelError, match="outside plate dims"):
+            validate(host)
+
+
+def test_nested_copy_counts_check_product_without_enumeration(monkeypatch):
+    from cffg.core.plate_grid import PlateGrid
+
+    def unexpected_iteration(_):
+        raise AssertionError("validation must use structural plate counts")
+
+    monkeypatch.setattr(PlateGrid, "__iter__", unexpected_iteration)
+    half_range = 1 << 62
+    middle = Template(name="middle", plates={"inner": PlateSpec(pixel_fragment(), (half_range,))})
+    host = Template(name="host", plates={"outer": PlateSpec(middle, (1,), (
+        Broadcast(f"inner/{half_range - 1}/x", "hub"),
+    ))})
+    validate(host)
+    host.plates["outer"] = PlateSpec(middle, (2,))
+    with pytest.raises(ModelError, match=r"inner.*dims.*with 2 enclosing copies.*signed 64-bit"):
         expand_plates(host)
+
+
+def test_nested_fragment_cycles_are_distinct_from_shared_fragments():
+    leaf = pixel_fragment()
+    inner = Template(name="middle", plates={"left": PlateSpec(leaf, (1,)), "right": PlateSpec(leaf, (2,))})
+    host = Template(name="host", plates={"outer": PlateSpec(inner, (2,))})
+    validate(host)
+    inner.plates["cycle"] = PlateSpec(host, (1,))
+    with pytest.raises(ModelError, match=r"outer.*cycle.*cyclic plate fragment reference.*host"):
+        validate(host)
+
+
+def test_nested_fragments_cannot_own_agent_interfaces(hmm_slice):
+    from cffg.core import AgentSpec
+
+    hmm_slice.agent = AgentSpec(action="x", beliefs=())
+    middle = Template(name="middle", plates={"inner": PlateSpec(hmm_slice, (1,))})
+    host = Template(name="host", plates={"outer": PlateSpec(middle, (2,))})
+    with pytest.raises(ModelError, match=r"outer.*inner.*fragment declares an AgentSpec"):
+        validate(host)
 
 
 def test_chain_endpoints_must_be_glue():

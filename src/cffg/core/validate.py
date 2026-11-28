@@ -24,6 +24,7 @@ from cffg.core.ir import (
     Chain,
     ConstraintKind,
     Expose,
+    PlateSpec,
     PortRole,
     Template,
 )
@@ -40,17 +41,20 @@ class ModelError(ValueError):
 
 
 def validate(t: Template) -> None:
-    problems: list[str] = []
-
-    problems += _check_factors(t)
-    problems += _check_degrees_and_ports(t)
-    problems += _check_constraints(t)
-    problems += _check_plates(t)
-    problems += _check_learnables(t)
-    problems += _check_agent(t)
-
+    problems = _model_problems(t, frozenset({id(t)}), 1)
     if problems:
         raise ModelError(t.name, problems)
+
+
+def _model_problems(t: Template, ancestors: frozenset[int], copies: int) -> list[str]:
+    return [
+        *_check_factors(t),
+        *_check_degrees_and_ports(t),
+        *_check_constraints(t),
+        *_check_plates(t, ancestors, copies),
+        *_check_learnables(t),
+        *_check_agent(t),
+    ]
 
 
 def _check_factors(t: Template) -> list[str]:
@@ -188,61 +192,115 @@ def _check_degrees_and_ports(t: Template) -> list[str]:
     return problems
 
 
-def _check_plates(t: Template) -> list[str]:
-    """Validate every plate SPEC (cff-cpxj): the fragment on its own, the
-    dims arity (1-D/2-D in phase 1), and each wiring rule's references."""
+def _copy_port(spec: PlateSpec, grid: PlateGrid, name: str) -> tuple[PortRole | None, str | None]:
+    # Broadcast hubs have no copy coordinates at their own level.
+    if any(isinstance(bond, Broadcast) and bond.hub == name for bond in spec.bonds):
+        return PortRole.GLUE, None
+    fields = name.split("/", len(grid.dims))
+    if len(fields) != len(grid.dims) + 1:
+        return None, None
+    try:
+        coordinate = tuple(int(field) for field in fields[:-1])
+    except ValueError:
+        return None, None
+    if tuple(map(str, coordinate)) != tuple(fields[:-1]):
+        return None, "copy coordinates must use their canonical integer names"
+    try:
+        grid.ordinal(coordinate)
+    except ValueError as error:
+        return None, str(error)
+
+    port_name = fields[-1]
+    role, reason = _fragment_port(spec.fragment, port_name)
+    if role is None:
+        return None, reason
+    for bond in spec.bonds:
+        if isinstance(bond, Broadcast) and bond.port == port_name:
+            return None, "copy port is consumed by a Broadcast"
+        if isinstance(bond, Chain) and not grid.chain_problems(bond.axis, bond.offset):
+            position = coordinate[bond.axis]
+            if ((bond.port_a == port_name and position + bond.offset < grid.dims[bond.axis])
+                    or (bond.port_b == port_name and position >= bond.offset)):
+                return None, "copy port is consumed by a Chain"
+    return role, None
+
+
+def _fragment_port(fragment: Template, name: str) -> tuple[PortRole | None, str | None]:
+    port = fragment.ports.get(name)
+    if port is not None:
+        return port.role, None
+
+    explanation = None
+    for plate, spec in fragment.plates.items():
+        prefix = plate + "/"
+        if not name.startswith(prefix):
+            continue
+        try:
+            grid = PlateGrid(spec.dims)
+        except (TypeError, ValueError):
+            continue  # The declaration itself reports the invalid grid.
+        role, reason = _copy_port(spec, grid, name[len(prefix):])
+        if role is not None:
+            return role, None
+        if reason is not None:
+            explanation = reason
+    return None, explanation
+
+
+def _check_plates(t: Template, ancestors: frozenset[int], copies: int) -> list[str]:
+    """Validate plate dimensions, fragment declarations and surviving ports."""
     problems: list[str] = []
+    copy_limit = (1 << 63) - 1
     for name, spec in sorted(t.plates.items()):
         try:
             grid = PlateGrid(spec.dims)
         except (TypeError, ValueError) as err:
             problems.append(f"plate {name!r}: {err}")
             grid = None
-        if grid is not None and len(grid.dims) > 2:
-            problems.append(f"plate {name!r}: dims {spec.dims} must be 1-D or 2-D in phase 1")
-        frag = spec.fragment
-        try:
-            validate(frag)
-        except ModelError as err:
-            problems += [f"plate {name!r} fragment: {p}" for p in err.problems]
-        if frag.plates:
+        combined = copies if grid is None else copies * grid.count
+        if combined > copy_limit >= copies:
             problems.append(
-                f"plate {name!r}: fragment declares nested plates "
-                f"{sorted(frag.plates)}; nested plate grounding is not "
-                "supported in phase 1"
+                f"plate {name!r}: dims {spec.dims} with {copies} enclosing copies "
+                "exceed the signed 64-bit copy count"
+            )
+
+        frag = spec.fragment
+        if id(frag) in ancestors:
+            problems.append(f"plate {name!r}: cyclic plate fragment reference to {frag.name!r}")
+        else:
+            problems.extend(
+                f"plate {name!r} fragment: {problem}"
+                for problem in _model_problems(frag, ancestors | {id(frag)}, min(combined, copy_limit + 1))
             )
         if frag.agent is not None:
             problems.append(
                 f"plate {name!r}: fragment declares an AgentSpec; the runtime "
                 "interface belongs on the complete host Template"
             )
-        for b in spec.per_copy_blobs:
-            if b not in frag.blobs:
-                problems.append(f"plate {name!r}: per_copy_blob {b!r} is not a fragment blob")
+        for blob in spec.per_copy_blobs:
+            if blob not in frag.blobs:
+                problems.append(f"plate {name!r}: per_copy_blob {blob!r} is not a fragment blob")
         for rule in spec.bonds:
             if isinstance(rule, Chain):
                 if grid is not None:
                     problems.extend(f"plate {name!r}: {reason}"
                                     for reason in grid.chain_problems(rule.axis, rule.offset))
-                for role, pname in (("port_a", rule.port_a), ("port_b", rule.port_b)):
-                    port = frag.ports.get(pname)
-                    if port is None:
+                for role, port_name in (("port_a", rule.port_a), ("port_b", rule.port_b)):
+                    port_role, reason = _fragment_port(frag, port_name)
+                    if port_role is None:
+                        message = f"plate {name!r}: chain {role} {port_name!r} is not a fragment port"
+                        problems.append(f"{message}: {reason}" if reason else message)
+                    elif port_role is not PortRole.GLUE:
                         problems.append(
-                            f"plate {name!r}: chain {role} {pname!r} is not a fragment port"
-                        )
-                    elif port.role is not PortRole.GLUE:
-                        problems.append(
-                            f"plate {name!r}: chain {role} {pname!r} must be a glue port "
-                            f"(has role {port.role.value})"
+                            f"plate {name!r}: chain {role} {port_name!r} must be a glue port "
+                            f"(has role {port_role.value})"
                         )
             elif isinstance(rule, Broadcast):
-                if rule.port not in frag.ports:
-                    problems.append(
-                        f"plate {name!r}: broadcast port {rule.port!r} is not a fragment port"
-                    )
-            elif isinstance(rule, Expose):
-                pass
-            else:  # pragma: no cover - closed vocabulary
+                port_role, reason = _fragment_port(frag, rule.port)
+                if port_role is None:
+                    message = f"plate {name!r}: broadcast port {rule.port!r} is not a fragment port"
+                    problems.append(f"{message}: {reason}" if reason else message)
+            elif not isinstance(rule, Expose):  # pragma: no cover - closed vocabulary
                 problems.append(f"plate {name!r}: unknown wiring rule {rule!r}")
     return problems
 

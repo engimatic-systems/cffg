@@ -1,4 +1,4 @@
-"""Resolve one-level plate wiring directly into the compiler's slot layout."""
+"""Resolve nested plate wiring directly into the compiler's slot layout."""
 
 from dataclasses import dataclass, replace
 
@@ -10,7 +10,7 @@ from cffg.core.compose import ComposeError
 from cffg.core.ir import EDGE_CONSTRAINTS, AgentSpec, GaussianFilterSpec, GaussianPlanSpec
 from cffg.core.equality_tree import equality_wiring
 from cffg.core.plate_grid import PlateGrid
-from cffg.core.plates import _prefix, _scoped_blob_refs, _scoped_learnables, _with_shared_owners
+from cffg.core.plates import _owner_template, _prefix, _prepared_plates, _scoped_blob_refs, _scoped_learnables
 from cffg.topology import BoundConstraint, ExteriorPort, FactorDeclaration, TopologyLayout, layout_addresses
 
 
@@ -58,7 +58,7 @@ def _declare(table, names, plate, kind):
 
 
 class _PlateWiring:
-    def __init__(self, template):
+    def __init__(self, template, depth):
         # Variable entries share the one domain declaration in the fragment until
         # slot layout gives the edge its name, domain and literal slot addresses.
         self.domains = dict(template.variables)
@@ -68,9 +68,16 @@ class _PlateWiring:
         }
         self.ports = dict(template.ports)
         self.constraints = [_constraint_prototype(c) for c in template.constraints]
-        owners = _with_shared_owners(template)
+        plates = list(_prepared_plates(template, _PlateWiring, depth))
+        owners = _owner_template(template, plates)
         self.blobs = owners.blobs
         self.learnables = owners.learnables
+        for name, spec, fragment, private in plates:
+            self.add(name, spec, fragment, private, depth)
+
+    @property
+    def variables(self):
+        return self.domains
 
     def callback_template(self, source):
         """Materialize legacy callback arguments only for a user-supplied IR reader."""
@@ -84,15 +91,13 @@ class _PlateWiring:
             blobs=self.blobs, learnables=self.learnables, agent=source.agent, schema_version=source.schema_version,
         )
 
-    def add(self, plate, spec):
+    def add(self, plate, spec, fragment, private, depth):
         grid = PlateGrid(spec.dims)
-        fragment = spec.fragment
         prefixes = [_prefix(plate, index) for index in grid]
-        private = frozenset(spec.per_copy_blobs)
         port_names = set()
         factor_names = set()
         for index, prefix in zip(grid, prefixes, strict=True):
-            _declare(self.domains, {f"{prefix}/{v.name}": v for v in fragment.variables.values()},
+            _declare(self.domains, {f"{prefix}/{name}": v for name, v in fragment.variables.items()},
                      plate, "variables")
             for local, current, previous, kind in (
                 (fragment.ports, port_names, self.ports, "ports"),
@@ -104,7 +109,7 @@ class _PlateWiring:
                     raise ComposeError(f"plate {plate!r}: {kind} name clash {collisions}")
                 current.update(new)
             if private:
-                _declare(self.blobs, _scoped_blob_refs(fragment, prefix, index, private), plate, "blobs")
+                _declare(self.blobs, _scoped_blob_refs(fragment, prefix, index, private, depth), plate, "blobs")
                 _declare(self.learnables, _scoped_learnables(fragment, prefix, private), plate, "learnables")
 
         aliases = {}
@@ -164,7 +169,8 @@ class _PlateWiring:
                 )
             for c in constraints:
                 target = endpoint(prefix, c.target) if c.kind in EDGE_CONSTRAINTS else f"{prefix}/{c.target}"
-                self.constraints.append(BoundConstraint(c, target))
+                declaration = c.declaration if isinstance(c, BoundConstraint) else c
+                self.constraints.append(BoundConstraint(declaration, target))
             for port in fragment.ports.values():
                 name = f"{prefix}/{port.name}"
                 if name in port_names:
@@ -182,9 +188,7 @@ class _PlateWiring:
 def lower_plates(template):
     """Validate the compact source, bind its copied endpoints, then allocate final slots."""
     validate(template)
-    wiring = _PlateWiring(template)
-    for name, plate in sorted(template.plates.items()):
-        wiring.add(name, plate)
+    wiring = _PlateWiring(template, 0)
     topology = layout_addresses(
         wiring.domains, wiring.factors, tuple(wiring.constraints), wiring.ports, use_edge_domains=True,
     )

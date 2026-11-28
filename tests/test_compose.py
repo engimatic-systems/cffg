@@ -192,13 +192,17 @@ def test_disjoint_scoped_merge_does_not_materialize_large_plates(monkeypatch, hm
     assert all(spec.dims == (1_000_000,) for spec in merged.plates.values())
 
 
-def test_nested_fragment_fails_before_scoping_or_merging(hmm_slice):
+def test_nested_fragment_preserves_scope_and_compact_source(hmm_slice):
     inner = Template("inner", plates={"cell": PlateSpec(hmm_slice, (1,))})
     outer = Template("outer", plates={"group": PlateSpec(inner, (2,))})
     before = to_json(outer)
-    for operation in (lambda: scoped(outer, "a"), lambda: merge(outer, Template("b"), "c")):
-        with pytest.raises(ValueError, match="nested plate grounding"):
-            operation()
+    flat = expand_plates(outer)
+    prefixed = scoped(outer, "a")
+    assert set(prefixed.plates) == {"a/group"}
+    assert to_dict(expand_plates(prefixed)) == to_dict(scoped(flat, "a"))
+    merged = merge(outer, Template("b"), "joined")
+    assert set(merged.plates) == {"group"}
+    assert to_dict(expand_plates(merged)) == to_dict(replace(flat, name="joined"))
     assert to_json(outer) == before
 
 

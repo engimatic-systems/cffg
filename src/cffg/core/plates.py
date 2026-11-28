@@ -13,7 +13,7 @@ wired together by the plate's bonds. The wiring vocabulary:
 - ``Expose``    — leftover ports stay exposed as ``plate/<i>/port`` (the
                   default in phase 1; the rule is the explicit marker).
 
-The compiler constructs slot addresses directly for one-level plates. This
+The compiler constructs slot addresses directly for compact plates. This
 public expansion also provides a reference for checking those addresses.
 """
 
@@ -60,27 +60,52 @@ def expand_plates(t: Template) -> Template:
     if not t.plates:
         return t
 
-    validate(t)  # spec validation (includes _check_plates)
+    validate(t)
+    return _expand(t, 0)
 
+
+def _prepared_plates(template, prepare, depth):
+    """Bind child fragments before copying them into this lexical scope.
+
+    An owner introduced by a child plate belongs to the enclosing copy.
+    A blob also declared directly by the enclosing fragment follows that
+    fragment's own tying rule.
+    """
+    for name, spec in sorted(template.plates.items()):
+        fragment = spec.fragment
+        private = frozenset(spec.per_copy_blobs)
+        if fragment.plates:
+            child = prepare(fragment, depth + 1)
+            private = private.union(child.blobs.keys() - fragment.blobs.keys())
+            fragment = child
+        yield name, spec, fragment, private
+
+
+def _owner_template(template, plates):
+    out = dataclasses.replace(template, blobs=dict(template.blobs), learnables=dict(template.learnables))
+    for name, spec, fragment, private in plates:
+        _install_shared(out, name, spec, fragment, private)
+    return out
+
+
+def _expand(template, depth):
+    plates = list(_prepared_plates(template, _expand, depth))
     out = dataclasses.replace(
-        _with_shared_owners(t),
-        variables=dict(t.variables),
-        factors=dict(t.factors),
-        constraints=list(t.constraints),
-        ports=dict(t.ports),
+        _owner_template(template, plates),
+        variables=dict(template.variables),
+        factors=dict(template.factors),
+        constraints=list(template.constraints),
+        ports=dict(template.ports),
         plates={},
     )
-    for pname in sorted(t.plates):
-        _expand_one(out, pname, t.plates[pname])
+    for name, spec, fragment, private in plates:
+        _expand_one(out, name, spec, fragment, private, depth)
     return out
 
 
-def _with_shared_owners(t: Template) -> Template:
-    """Expose tied owners in the parent without materializing any copies."""
-    out = dataclasses.replace(t, blobs=dict(t.blobs), learnables=dict(t.learnables))
-    for pname, spec in sorted(t.plates.items()):
-        _install_shared(out, pname, spec)
-    return out
+def _with_shared_owners(template, depth=0):
+    """Collect externally tied owners during composition without allocating copies."""
+    return _owner_template(template, _prepared_plates(template, _with_shared_owners, depth))
 
 
 def _prefix(plate: str, idx: tuple[int, ...]) -> str:
@@ -91,11 +116,16 @@ def _scoped(prefix: str, name: str) -> str:
     return prefix + SCOPE_SEP + name
 
 
-def _scoped_blob_refs(fragment, prefix, index, per_copy):
+def _scoped_blob_refs(fragment, prefix, index, per_copy, depth):
+    coordinate = SCOPE_SEP.join(map(str, index))
+    # A plain marker denotes the whole numeric coordinate. Binding proceeds
+    # inside out, so leave its enclosing part for the next level.
+    full_index = f"{PLATE_INDEX_TOKEN}/{coordinate}" if depth else coordinate
+    level_token = "{index:" + str(depth) + "}"
     return {
         _scoped(prefix, b.name): BlobRef(
             _scoped(prefix, b.name),
-            b.path.replace(PLATE_INDEX_TOKEN, SCOPE_SEP.join(map(str, index))),
+            b.path.replace(level_token, coordinate).replace(PLATE_INDEX_TOKEN, full_index),
             b.init,
         )
         for b in fragment.blobs.values()
@@ -103,27 +133,23 @@ def _scoped_blob_refs(fragment, prefix, index, per_copy):
     }
 
 
-def expanded_blob_refs(template):
-    """Resolve blob declarations from a structurally validated plate template.
-
-    Cached consumers already own the expanded wiring. They still use the
-    caller's current file paths and initializer data for every numeric bind.
-    """
-    blobs = _with_shared_owners(template).blobs
-    for name, spec in sorted(template.plates.items()):
-        per_copy = frozenset(spec.per_copy_blobs)
-        if per_copy:
+def _numeric_sources(template, depth):
+    blobs = dict(template.blobs)
+    for name, spec, fragment, private in _prepared_plates(template, _numeric_sources, depth):
+        _install_shared_blobs(blobs, name, spec, fragment, private)
+        if private:
             for index in PlateGrid(spec.dims):
-                blobs.update(_scoped_blob_refs(spec.fragment, _prefix(name, index), index, per_copy))
-    return blobs
+                blobs.update(_scoped_blob_refs(fragment, _prefix(name, index), index, private, depth))
+    return dataclasses.replace(template, blobs=blobs)
 
 
-def _scope_copy(
-    spec: PlateSpec, prefix: str, index: tuple[int, ...], per_copy: frozenset[str]
-) -> tuple[dict, dict, list, dict, dict, dict]:
+def expanded_blob_refs(template):
+    """Resolve current paths and initializers on a structurally validated cache hit."""
+    return _numeric_sources(template, 0).blobs
+
+
+def _scope_copy(spec, frag, prefix, index, per_copy, depth):
     """Scope copy-local declarations under the index and tied blobs under their owner."""
-    frag = spec.fragment
-
     def s(name: str) -> str:
         return _scoped(prefix, name)
 
@@ -148,7 +174,7 @@ def _scope_copy(
     ports = {
         s(pt.name): PortSpec(s(pt.name), s(pt.variable), pt.role) for pt in frag.ports.values()
     }
-    per_copy_blobs = _scoped_blob_refs(frag, prefix, index, per_copy)
+    per_copy_blobs = _scoped_blob_refs(frag, prefix, index, per_copy, depth)
     per_copy_learnables = _scoped_learnables(frag, prefix, per_copy)
     return variables, factors, constraints, ports, per_copy_blobs, per_copy_learnables
 
@@ -167,16 +193,18 @@ def _scoped_learnables(fragment, prefix, per_copy):
     }
 
 
-def _install_shared(out: Template, plate: str, spec: PlateSpec) -> None:
-    frag = spec.fragment
-    per_copy = frozenset(spec.per_copy_blobs)
+def _install_shared_blobs(blobs, plate, spec, frag, per_copy):
     for b in frag.blobs.values():
         if b.name not in per_copy:
             name = spec.shared_name(b.name)
             ref = dataclasses.replace(b, name=name)
-            if name in out.blobs and out.blobs[name] != ref:
+            if name in blobs and blobs[name] != ref:
                 raise ComposeError(f"plate {plate!r}: conflicting declarations for tied blob {name!r}")
-            out.blobs[name] = ref
+            blobs[name] = ref
+
+
+def _install_shared(out, plate, spec, frag, per_copy):
+    _install_shared_blobs(out.blobs, plate, spec, frag, per_copy)
 
     # A learnable over tied blobs stays ONE posterior for the whole plate:
     # every copy's factor instance reads the same blob, so every copy's
@@ -212,12 +240,11 @@ def _install_shared(out: Template, plate: str, spec: PlateSpec) -> None:
         )
 
 
-def _expand_one(out: Template, plate: str, spec: PlateSpec) -> None:
-    per_copy = frozenset(spec.per_copy_blobs)
+def _expand_one(out, plate, spec, fragment, per_copy, depth):
     for idx in PlateGrid(spec.dims):
         prefix = _prefix(plate, idx)
         variables, factors, constraints, ports, pblobs, plearn = _scope_copy(
-            spec, prefix, idx, per_copy
+            spec, fragment, prefix, idx, per_copy, depth
         )
         for kind, new in (
             ("variables", variables),

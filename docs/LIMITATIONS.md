@@ -860,8 +860,10 @@ design possibility, not delivered structure learning.
 **S7. Scale engineering.** Sparse A/B matrices, factored transition tensors,
 GPU-resident arenas, incremental recompilation, smarter (residual) schedules —
 ordinary optimization work, unbounded appetite.
-Plate fragments may not themselves declare plates in phase 1; validation rejects
-that unsupported grounding shape until recursive/index-table expansion in cff-6s31.
+Nested plates compile to concrete slot and parameter arrays. Memory for those
+arrays grows with the product of the active dimensions. An agent declaration
+belongs on the outer model. An outer bond can use an inner Broadcast hub or
+a surviving boundary port.
 Scoping and disjoint merging preserve compact storage. When declared names
 overlap another operand's plate prefix, collision checking can temporarily
 materialize the copies. Distinct top-level scopes avoid that cost.
