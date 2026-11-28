@@ -38,7 +38,7 @@ function authorPrompt(model) {
   ].join('\n\n');
 }
 
-export function setupTours({rootModel, showTarget, clearTarget, currentModel, report}) {
+export function setupTours({rootModel, showTarget, clearTarget, finishTarget, currentModel, report}) {
   const dialog = node("dialog");
   dialog.id = "studio-tours";
   dialog.className = "tour-dialog";
@@ -48,16 +48,42 @@ export function setupTours({rootModel, showTarget, clearTarget, currentModel, re
   heading.tabIndex = -1;
   const progress = node("span", undefined, "tour.progress");
   progress.className = "tour-progress";
+  const motionSetting = "studio.tour.animations";
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const animations = node("input", undefined, "tour.animations");
+  animations.type = "checkbox";
+  let preference;
+  try { preference = localStorage.getItem(motionSetting); } catch {}
+  animations.checked = preference == null ? !reducedMotion.matches : preference === "on";
+  const motionLabel = node("label", undefined, "tour.animations");
+  motionLabel.append(animations,"Animations");
+  motionLabel.hidden = true;
+  const header = node("header");
+  header.append(progress,motionLabel);
   const body = node("div");
   const controls = node("footer");
   const ring = node("div");
   ring.className = "tour-ring";
   ring.setAttribute("aria-hidden", "true");
   const card = node("section");
-  card.append(progress, heading, body, controls);
+  card.append(header, heading, body, controls);
   dialog.append(ring, card);
   document.body.append(dialog);
-  let owner, tour, index, target, trigger, generation = 0;
+  let owner, tour, index, target, trigger, ringAnimation, generation = 0;
+  function settleMotion() {
+    ringAnimation?.cancel();
+    finishTarget();
+  }
+  animations.addEventListener("change", () => {
+    preference = animations.checked ? "on" : "off";
+    try { localStorage.setItem(motionSetting,preference); } catch {}
+    if (!animations.checked) settleMotion();
+  });
+  reducedMotion.addEventListener("change", () => {
+    if (preference != null) return;
+    animations.checked = !reducedMotion.matches;
+    if (!animations.checked) settleMotion();
+  });
   function action(label, help, fn, primary=false) {
     const button = node("button", label, help);
     button.type = "button";
@@ -86,6 +112,8 @@ export function setupTours({rootModel, showTarget, clearTarget, currentModel, re
   }
   function list() {
     generation++;
+    ringAnimation?.cancel();
+    motionLabel.hidden = true;
     clearTarget();
     tour = null; target = null; ring.hidden = true;
     dialog.classList.remove("playing");
@@ -127,13 +155,29 @@ export function setupTours({rootModel, showTarget, clearTarget, currentModel, re
     }
     body.querySelector("button")?.focus();
   }
-  async function step(next) {
+  // The introductory tour travels between workstation panels in screen coordinates.
+  function moveRing(from) {
+    const to = ring.getBoundingClientRect();
+    const width = Math.min(innerWidth-6,Math.max(from.width,to.width)*1.12 + Math.abs(from.x-to.x)*.5);
+    const height = Math.min(innerHeight-6,Math.max(from.height,to.height)*1.12 + Math.abs(from.y-to.y)*.5);
+    function bounds(rect,w,h,offset) {
+      const x = Math.max(3,Math.min(innerWidth-w-3,rect.x+(rect.width-w)/2));
+      const y = Math.max(3,Math.min(innerHeight-h-3,rect.y+(rect.height-h)/2));
+      return {left:x+"px",top:y+"px",width:w+"px",height:h+"px",easing:"ease-in-out",offset};
+    }
+    ringAnimation = ring.animate([bounds(from,from.width,from.height,0),bounds(from,width,height,.3),
+      bounds(to,width,height,.7),bounds(to,to.width,to.height,1)], {duration:850});
+  }
+  async function step(next, travel=true) {
     if (!tour || next < 0 || next >= tour.steps.length) return;
     const seq = ++generation;
+    const from = !ring.hidden && target?.isConnected ? ring.getBoundingClientRect() : null;
+    ringAnimation?.cancel();
     clearTarget();
     index = next; target = null; ring.hidden = true;
     const stop = tour.steps[index];
     progress.textContent = tour.title+" · "+(index+1)+" of "+tour.steps.length;
+    motionLabel.hidden = false;
     heading.textContent = stop.title;
     heading.dataset.help = "tour.step";
     body.replaceChildren(node("p", stop.text, "tour.step"));
@@ -161,10 +205,12 @@ export function setupTours({rootModel, showTarget, clearTarget, currentModel, re
     position();
     heading.focus({preventScroll:true});
     const current = () => seq === generation && dialog.open;
+    const animate = () => travel && animations.checked;
+    const play = (scene, allowMotion=true) => scene?.focus?.(card, allowMotion && animate());
     let result;
     try {
       result = tour === intro ? {target:document.querySelector(stop.target)}
-                             : await showTarget(owner, stop, current);
+                             : await showTarget(owner, stop, current, play, animate);
     } catch (error) {
       if (seq === generation) body.append(node("p", error.message, "tour.target-error"));
     }
@@ -184,7 +230,8 @@ export function setupTours({rootModel, showTarget, clearTarget, currentModel, re
         surface.scrollIntoView({block:"nearest",inline:"nearest"});
     }
     position();
-    result?.focus?.(card);
+    if (from && tour === intro && !ring.hidden && travel && animations.checked) moveRing(from);
+    play(result);
   }
   function start(entry) { tour = entry; return step(0); }
   async function open(id) {
@@ -212,6 +259,7 @@ export function setupTours({rootModel, showTarget, clearTarget, currentModel, re
   }, true);
   dialog.addEventListener("close", () => {
     ++generation; tour = null; target = null; ring.hidden = true;
+    ringAnimation?.cancel();
     clearTarget();
     if (trigger?.isConnected) trigger.focus({preventScroll:true});
   });
@@ -229,6 +277,6 @@ export function setupTours({rootModel, showTarget, clearTarget, currentModel, re
       tour = owner.metadata.tours?.[tour.id];
       if (!tour) { list(); body.prepend(node("p", "This tour was removed in the current revision.", "tour.missing")); return; }
     }
-    await step(Math.min(index, tour.steps.length-1));
+    await step(Math.min(index, tour.steps.length-1),false);
   }};
 }

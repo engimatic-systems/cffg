@@ -2,21 +2,29 @@
 export function createTourCamera({svg, layer, scene, byRef, drawRow, view, move, redraw}) {
   const targets = new Set();
   let region = null, marker = null, card = null, animation = 0;
+  let settled = null, lastViewport = '';
 
-  function clear() {
+  function stop() {
     cancelAnimationFrame(animation);
     animation = 0;
+    settled?.();
+    settled = null;
+  }
+
+  function clear() {
+    stop();
     region = null;
     card = null;
+    lastViewport = '';
     marker?.remove();
     marker = null;
     if (targets.size) { targets.clear(); redraw(); }
   }
 
-  function destination(width, height) {
+  function destination(width, height, bounds=region) {
     const fit = (x,y,w,h) => {
       const pad = marker ? Math.min(32,w/8,h/8) : 0;
-      return {x:x+w/2, y:y+h/2, scale:Math.min((w-2*pad)/region.w,(h-2*pad)/region.h)};
+      return {x:x+w/2, y:y+h/2, width:w, height:h, scale:Math.min((w-2*pad)/bounds.w,(h-2*pad)/bounds.h)};
     };
     const canvas = svg.getBoundingClientRect();
     const x = Math.max(0,-canvas.left), y = Math.max(0,-canvas.top);
@@ -28,7 +36,7 @@ export function createTourCamera({svg, layer, scene, byRef, drawRow, view, move,
     const right = Math.min(r,cover.right-canvas.left+6), bottom = Math.min(b,cover.bottom-canvas.top+6);
     if (left >= right || top >= bottom) return full;
     const scale = Math.min(full.scale,marker ? 2.2 : 2);
-    const dx = region.w*scale/2, dy = region.h*scale/2;
+    const dx = bounds.w*scale/2, dy = bounds.h*scale/2;
     if (full.x+dx <= left || full.x-dx >= right || full.y+dy <= top || full.y-dy >= bottom) return full;
     // Fit above, below or beside the narration, choosing the most readable scale.
     const spaces = [fit(x,y,r-x,top-y), fit(x,bottom,r-x,b-bottom),
@@ -36,36 +44,63 @@ export function createTourCamera({svg, layer, scene, byRef, drawRow, view, move,
     return spaces.reduce((best,next) => next.scale > best.scale ? next : best);
   }
 
-  function frame(animate) {
+  function frame(animate, onlyIfResized=false) {
     if (!region) return;
-    cancelAnimationFrame(animation);
     const {width, height, left, top, scale} = view();
     const {x, y, w, h} = region;
     const center = destination(width,height);
+    const viewport = [width,height,center.x,center.y,center.width,center.height,center.scale].join(',');
+    if (onlyIfResized && lastViewport === viewport) return;
+    lastViewport = viewport;
+    stop();
     if (center.scale <= 0) return;
     const endScale = Math.min(marker ? 2.2 : 2, center.scale);
     const cx = (center.x - left) / scale, cy = (center.y - top) / scale;
     const endX = x + w/2, endY = y + h/2;
-    function place(t) {
-      const s = scale * (endScale/scale) ** t;
-      move(center.x - (cx + (endX-cx)*t)*s, center.y - (cy + (endY-cy)*t)*s, s);
+    function place(worldX, worldY, zoom, screenX=center.x, screenY=center.y) {
+      move(screenX-worldX*zoom, screenY-worldY*zoom, zoom);
     }
-    if (!animate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      place(1);
+    if (!animate) {
+      place(endX,endY,endScale);
       return;
     }
+    // At mid-pan the previous view and the entire destination fit together.
+    const dx = endX-cx, dy = endY-cy;
+    const spanX = Math.abs(dx) + Math.max(w,2*Math.max(center.x,width-center.x)/scale);
+    const spanY = Math.abs(dy) + Math.max(h,2*Math.max(center.y,height-center.y)/scale);
+    const route = destination(width,height,{w:spanX,h:spanY});
+    const wide = Math.min(.75*scale,.75*endScale,.88*route.scale);
+    const shiftX = route.x-center.x, shiftY = route.y-center.y;
+    const duration = Math.min(1450,850 + 110*Math.log2(Math.max(scale,endScale)/wide));
     const start = performance.now();
+    const ease = t => t*t*(3-2*t);
     function tick(now) {
-      const t = Math.min(1, Math.max(0, (now-start)/320));
-      place(t*t*(3-2*t));
-      animation = t < 1 ? requestAnimationFrame(tick) : 0;
+      const t = Math.max(0,(now-start)/duration);
+      if (t < .3) {
+        const out = ease(t/.3);
+        place(cx,cy,scale*(wide/scale)**out,center.x+shiftX*out,center.y+shiftY*out);
+      } else if (t < .7) {
+        const pan = ease((t-.3)/.4);
+        place(cx+dx*pan,cy+dy*pan,wide,route.x,route.y);
+      } else if (t < 1) {
+        const into = ease((t-.7)/.3);
+        place(endX,endY,wide*(endScale/wide)**into,route.x-shiftX*into,route.y-shiftY*into);
+      } else {
+        place(endX,endY,endScale);
+        stop();
+        return;
+      }
+      animation = requestAnimationFrame(tick);
     }
-    animation = requestAnimationFrame(tick);
+    return new Promise(resolve => {
+      settled = resolve;
+      animation = requestAnimationFrame(tick);
+    });
   }
 
-  function focus(narration) {
+  function focus(narration, animate) {
     card = narration;
-    frame(true);
+    return frame(animate);
   }
 
   function show(refs) {
@@ -105,5 +140,5 @@ export function createTourCamera({svg, layer, scene, byRef, drawRow, view, move,
     redraw();
     return {target:marker, offCanvas, focus};
   }
-  return {targets, show, clear, resize:() => frame(false)};
+  return {targets, show, clear, finish:() => frame(false), resize:() => frame(false,true)};
 }

@@ -94,7 +94,7 @@ async function refresh() {
   }
   if(!state.models.length) list.append(el('p','No saved models. Create a graph to begin.','empty'));
 }
-async function openModel(id,preserve=false,plate=preserve && state.model?.id===id ? state.plate : '',current=()=>true) {
+async function openModel(id,preserve=false,plate=preserve && state.model?.id===id ? state.plate : '',current=()=>true,onMount) {
   const seq=++state.openSequence;
   const snap=await api('/v1/models/'+id+(plate?'?plate='+encodeURIComponent(plate):''));
   if(seq!==state.openSequence || !current()) return;
@@ -113,6 +113,7 @@ async function openModel(id,preserve=false,plate=preserve && state.model?.id===i
   state.graph=mountGraph($('graph'),snap,ref=>select(ref,false));
   if(!Object.hasOwn(snap.metadata.anchors || {},state.ref)) state.ref='';
   if(state.ref) state.graph.select(state.ref);
+  onMount?.(state.graph);
   if(!snap.scene.items.length) {
     const empty=el('div',null,'studio-add-first');
     empty.append(el('h3','Start your graph'),button('Add variable and prior',addChannel));
@@ -236,7 +237,7 @@ function editForm(title,specs,build,hint='') {
     await openModel(id,true);
   },'Preview change',hint,'form.preview');
 }
-function enterPlate(name,current) {return openModel(state.model.id,true,name,current);}
+function enterPlate(name,current,onMount) {return openModel(state.model.id,true,name,current,onMount);}
 function create() {
   form('New model',[field('field.modelName','name','Model name','text','Untitled graph'),field('field.starter','kind','Starting point','select','blank',{choices:[['blank','Blank graph'],['kalman','Linear Gaussian state space'],['rslds','Recurrent switching linear dynamical system']]}),
     field('field.timeSteps','steps','Time steps','number',3,{min:1,max:256}),field('field.latent','latent','Latent dimensions','number',1,{min:1,max:64}),
@@ -480,13 +481,30 @@ const tours=setupTours({
   currentModel:()=>state.model?.id,
   rootModel:()=>state.plate ? api(modelPath()) : state.model,
   clearTarget:()=>state.graph?.clearTour(),
-  async showTarget(owner,stop,current) {
+  finishTarget:()=>state.graph?.finishTour(),
+  async showTarget(owner,stop,current,play,animate) {
     if (state.model?.id !== owner.id || !current()) return;
     const plateRef=stop.plate_anchor && Object.keys(owner.metadata.anchors)
       .find(ref=>owner.metadata.anchors[ref]===stop.plate_anchor);
     if (stop.plate_anchor && !plateRef) {select(''); return {missing:['plate:'+stop.plate]};}
     const scope=plateRef ? plateRef.slice(6) : '';
-    if ((state.plate || '') !== scope) await enterPlate(scope,current);
+    if ((state.plate || '') !== scope) {
+      // The plate box on the parent canvas links the two coordinate systems.
+      const previous = state.plate;
+      if (previous && animate()) {
+        await play(state.graph.showTour([]));
+        if (!current()) return;
+        if (animate()) {
+          await enterPlate('',current,graph=>play(graph.showTour(['plate:'+previous]),false));
+          if (!current() || state.plate) return;
+        }
+      }
+      if (!state.plate && scope && animate()) {
+        await play(state.graph.showTour([plateRef]));
+        if (!current()) return;
+      }
+      if ((state.plate || '') !== scope) await enterPlate(scope,current);
+    }
     if (!current() || state.model?.id!==owner.id || (state.plate || '')!==scope) return;
     const anchors=stop.anchors || (stop.anchor ? [stop.anchor] : []);
     const names=stop.refs || [stop.ref];

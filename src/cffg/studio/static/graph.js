@@ -622,7 +622,7 @@ export function mountGraph(container, snapshot, selectCallback) {
   observer.observe(svg);
   window.addEventListener("scroll",camera.resize,{signal:signal.signal});
   resize();
-  return {select,hover,showTour:camera.show,clearTour:camera.clear,zoom,fit,destroy() {
+  return {select,hover,showTour:camera.show,clearTour:camera.clear,finishTour:camera.finish,zoom,fit,destroy() {
     camera.clear();
     hover(null);
     signal.abort();

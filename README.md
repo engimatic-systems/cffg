@@ -68,9 +68,13 @@ agent needs the Studio endpoint and its own edit token (see **Coding agents**
 below). Open the playback link the agent returns, or select its tour under
 **Tours**.
 
-Use **←** and **→** to page through stops and **Escape** to leave. The canvas
-pans and zooms to show each highlighted group together. With reduced motion
-enabled, it jumps directly there. **Copy link** shares the tour. For a walkthrough
+Use **←** and **→** to page through stops and **Escape** to leave. With
+**Animations** on, the camera pulls back to show both stops, pans across the
+graph, then zooms in on the next highlighted group. Crossing into or out of a
+plate takes you through its box on the parent graph. Turn **Animations** off to
+jump directly to each stop. Studio remembers your choice in this browser.
+Animations start on unless your system requests reduced motion.
+**Copy link** shares the tour. For a walkthrough
 of the editor itself, choose **Tours → Getting started with CFFG Studio**.
 
 For example, an agent can save this command array as `tour.json` for the

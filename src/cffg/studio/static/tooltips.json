@@ -1577,6 +1577,18 @@
       "draft": "A read-only field with the selected tour request for this model. It appears when the browser cannot copy the request automatically. Use the normal Copy shortcut, then paste it into your coding agent.",
       "text": "This element is a read-only text field showing the selected tour request for this model. It appears when your browser cannot copy the request automatically. Copy the text using your standard copy shortcut, then paste it into your coding agent.",
       "review": "approved"
+    },
+    "tour.animations": {
+      "draft": "Choose whether tour stops move into view. On model tours the graph zooms out, pans, and zooms in. In the introductory tour the highlight moves between controls. Off goes directly to a stop. Studio remembers your choice in this browser and initially follows your reduced-motion setting.",
+      "text": "This element is a setting that controls whether tours animate between stops or jump directly to them. During model tours, the graph zooms out, pans, and zooms in, whereas in the introductory tour, only the highlight moves between controls. Studio saves your preference in this browser and initially matches your system's reduced-motion setting.",
+      "review": "approved",
+      "previous_reviews": [
+        {
+          "text": "This element is a toggle for whether tour stops move smoothly into view or appear immediately. When on, Studio zooms out, pans across the graph, and zooms in so you can follow the route; when off, it jumps straight to each stop. Studio saves your choice in this browser, and before you choose, it follows your reduced-motion setting.",
+          "review": "revise",
+          "reason": "The first completion implies the graph moves during the introductory tour. Only model tours move the graph camera. The introductory tour moves the highlight between controls. Make that distinction explicit."
+        }
+      ]
     }
   }
 }

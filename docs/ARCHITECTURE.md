@@ -2375,8 +2375,12 @@ selection anchors, annotations, review threads, recipe hints, guided tours and
 grid offsets. A tour stop can frame its whole scope, a single anchor, or an
 ordered group of anchors from one model or plate fragment. The browser measures
 the surviving targets' SVG geometry, including offscreen marks and labels,
-then fits and highlights them together. Paging cancels pending camera movement
-and plate loads from the previous stop. Native bundles retain the numerical model while Studio project
+then fits and highlights them together. During animated playback the camera
+sizes the pullback to include the departure and destination, pans at that scale
+and zooms into the destination. A plate box connects the parent and fragment
+coordinate systems. Motion is a viewer preference stored in the browser.
+Paging cancels pending camera movement and plate loads from the previous stop.
+Native bundles retain the numerical model while Studio project
 exchange and revision history carry its tours.
 Agents and the browser issue the same revision-checked commands. Metadata edits
 retain the accepted model bytes. Model edits serialize, reload and pass compiler
