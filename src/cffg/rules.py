@@ -744,6 +744,13 @@ def gfe_energy(log_d, a_param, logc, learned=False):
     return gfe_energy_stats(log_d, abar, hbar, logc)
 
 
+def mu3_particle_tolerance(dtype):
+    """Absolute unit-column tolerance of a fixed table in its storage dtype."""
+    # Dirichlet preparation admits 64 eps each for relative and absolute
+    # roundoff at one. Exact integer tables need no roundoff allowance.
+    return 128 * jnp.finfo(dtype).eps if jnp.issubdtype(dtype, jnp.inexact) else 0
+
+
 def mu3_log_message(particles, zbars, logcs, abar):
     """Evaluate ``Σ_t log μ₃,t(A_s)`` for fixed Dirichlet particles.
 
@@ -754,10 +761,16 @@ def mu3_log_message(particles, zbars, logcs, abar):
     float32 underflow cannot turn them into structural zeros. Zero sampled
     mass is inert; positive sampled mass over a zero marginal predictive
     remains non-finite so the caller can report the incoherent cavity as
-    divergence.
+    divergence. A fixed table must be finite, nonnegative, and each column
+    must sum to one within 128 eps of its storage dtype. A malformed table
+    receives NaN so the importance update rejects the entire sample bank.
     """
+    particle_tolerance = mu3_particle_tolerance(jnp.asarray(particles).dtype)
     dtype = jnp.result_type(particles, zbars, logcs, abar)
     particles = jnp.asarray(particles, dtype=dtype)
+    valid_tables = jnp.all(jnp.isfinite(particles) & (particles >= 0), axis=(1, 2))
+    column_error = jnp.abs(jnp.sum(particles, axis=1) - 1)
+    valid_tables &= jnp.all(column_error <= particle_tolerance, axis=1)
     zbars = jnp.asarray(zbars, dtype=dtype)
     logcs = jnp.asarray(logcs, dtype=dtype)
     abar = jnp.asarray(abar, dtype=dtype)
@@ -817,23 +830,27 @@ def mu3_log_message(particles, zbars, logcs, abar):
         jnp.where(particles_positive, particles * log_particles, 0.0), axis=1
     )
     entropy = jnp.einsum("ti,si->st", zbars, particle_h)
-    return jnp.sum(fit - entropy, axis=-1)
+    return jnp.where(valid_tables, jnp.sum(fit - entropy, axis=-1), jnp.nan)
 
 
 def mu3_importance_update(particles, zbars, logcs, abar):
     """Self-normalized IS coordinate update for the functional μ₃ message.
 
     Returns ``(Abar, hbar, weights, log_Z, E_phi, KL, ESS, status)`` where
-    status is 0 on a valid estimate and 2 when weights collapse or contain a
-    NaN/+inf.  Low ESS is a caller-configured inference-budget outcome.
+    status is 0 for finite moments and diagnostics with normalized weights.
+    Malformed particles, incoherent scores, or collapsed weights yield 2.
+    Low ESS is a caller-configured inference-budget outcome.
     """
     logw = mu3_log_message(particles, zbars, logcs, abar)
     bad = jnp.any(jnp.isnan(logw) | jnp.isposinf(logw))
     finite_any = jnp.any(jnp.isfinite(logw))
     safe = jnp.where(jnp.isfinite(logw), logw, -jnp.inf)
-    log_norm = logsumexp(safe)
+    # Center once so a large common score cannot round away log(sum(exp)).
+    shift = jnp.where(finite_any, jnp.max(safe, initial=-jnp.inf), 0.0)
+    centered = safe - shift
+    log_norm = logsumexp(centered)
     invalid = bad | ~finite_any | ~jnp.isfinite(log_norm)
-    weights = jnp.where(invalid, jnp.zeros_like(safe), jnp.exp(safe - log_norm))
+    weights = jnp.where(invalid, 0.0, jnp.exp(centered - log_norm))
 
     new_abar = jnp.einsum("s,soi->oi", weights, particles)
     log_particles = jnp.where(particles > 0, jnp.log(particles), 0.0)
@@ -841,14 +858,17 @@ def mu3_importance_update(particles, zbars, logcs, abar):
         jnp.where(particles > 0, particles * log_particles, 0.0), axis=1
     )
     new_hbar = jnp.einsum("s,si->i", weights, particle_h)
-    expected_phi = jnp.sum(jnp.where(weights > 0, weights * safe, 0.0))
-    sample_count = jnp.asarray(particles.shape[0], dtype=particles.dtype)
-    log_z = log_norm - jnp.log(sample_count)
-    kl = expected_phi - log_z
-    ess = jnp.where(
-        invalid, jnp.asarray(0.0, dtype=particles.dtype),
-        1.0 / jnp.sum(jnp.square(weights)),
-    )
+    centered_phi = jnp.sum(jnp.where(weights > 0, weights * centered, 0.0))
+    centered_log_z = log_norm - jnp.log(jnp.asarray(weights.size, weights.dtype))
+    expected_phi = centered_phi + shift
+    log_z = centered_log_z + shift
+    kl = centered_phi - centered_log_z
+    ess = 1.0 / jnp.sum(jnp.square(weights))
+    weight_error = jnp.abs(jnp.sum(weights) - 1)
+    invalid |= ~(weight_error <= 128 * jnp.finfo(weights.dtype).eps)
+    invalid |= ~jnp.all(jnp.isfinite(new_abar)) | ~jnp.all(jnp.isfinite(new_hbar))
+    invalid |= ~jnp.all(jnp.isfinite(jnp.stack((log_z, expected_phi, kl, ess))))
+    ess = jnp.where(invalid, 0.0, ess)
     status = jnp.where(invalid, 2, 0)
     return new_abar, new_hbar, weights, log_z, expected_phi, kl, ess, status
 

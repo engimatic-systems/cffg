@@ -2250,7 +2250,11 @@ discarding a joint correlation. Exact joint rollover remains the separate
   one normalization; the weighted `E[A]` and `E[h(A)]` feed the Fig. 5
   composite without moment-matching back to a Dirichlet. `RunResult` exposes
   ESS, log-normalizer, and converged/budget-exhausted/diverged stochastic
-  status. Exact-zero sampled mass is inert, goal-excluded positive mass has
+  status. Each fixed particle must be finite and nonnegative, with outcome
+  columns summing to one within 128 eps of the particle dtype. A malformed
+  table fails its entire bank in both direct and batched importance updates
+  (`test_malformed_particle_fails_only_its_own_bank`). Exact-zero sampled
+  mass is inert, goal-excluded positive mass has
   zero weight, and positive sampled mass over a zero marginal predictive is an
   incoherent cavity reported as divergence; the independent D6b formula and
   Engine propagation are pinned in

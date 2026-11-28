@@ -421,11 +421,11 @@ epistemics price latent next-state information optimistically; consult
 [Known Limitations](docs/LIMITATIONS.md#soft-limitations) before interpreting
 it as realizable information gain.
 
-Two current input hazards need caller-side checks: fixed GFE likelihoods and
-goals must be finite, nonnegative, and normalized along their documented
-probability axes; caller-supplied fixed mu3 particles must be finite,
-nonnegative probability tables. Some low-level paths do not yet reject every
-violation before it can corrupt the reported objective or moment.
+The compiler checks that fixed GFE likelihoods and goals are finite,
+nonnegative, and normalized along their documented probability axes.
+For fixed mu3 particles, the importance rule checks each probability table.
+One nonfinite entry, negative entry, or column sum outside the dtype tolerance
+makes that update diverge. Exact zero probabilities are supported.
 
 `cffg.experiments.behavioral_epistemics.run_benchmark` is the bounded costly-cue
 scientific oracle used to compare epistemic planning with a BFE ablation. It is

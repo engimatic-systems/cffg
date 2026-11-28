@@ -239,6 +239,19 @@ def test_incoherent_predictive_support_diverges_through_engine():
     assert result.mu3_statuses == (RunStatus.DIVERGED,)
 
 
+def test_engine_rejects_corruption_of_one_prepared_particle():
+    engine = _engine(samples=32)
+    state, _ = engine.prepare_mu3(engine.init_state(), jax.random.PRNGKey(31))
+    key = engine.arena.mu3_groups[0].name + ":samples"
+    for invalid in (jnp.nan, -0.125):
+        params = dict(state.params)
+        params[key] = params[key].at[0, 0, 0].set(invalid)
+        result = engine.run(_replace(state, params=params), 10, tol=1e-6, harden_last=0)
+        assert result.status is RunStatus.DIVERGED
+        if np.isfinite(invalid):
+            assert result.mu3_statuses == (RunStatus.DIVERGED,)
+
+
 def test_post_root_mu3_divergence_overrides_outer_convergence(monkeypatch):
     engine = _engine(samples=32)
     state, _ = engine.prepare_mu3(
@@ -345,6 +358,80 @@ def test_production_rule_float32_at_uncomfortable_scale_and_exact_zero_support()
         boundary[0],
     )
     np.testing.assert_array_equal(score, [0.0])
+
+
+@pytest.mark.parametrize("dtype", (jnp.float32, jnp.float64))
+def test_malformed_particle_fails_only_its_own_bank(dtype):
+    # Ten times the four-particle reproducer. Each column has exact zeros,
+    # and both the incoming belief and the goal supply uniform evidence.
+    eye = jnp.eye(2, dtype=dtype)
+    bank = jnp.tile(jnp.stack((eye, 1 - eye)), (20, 1, 1))
+    z = jnp.full((1, 2), 0.5, dtype)
+    goal = jnp.log(z)
+    mean = jnp.full((2, 2), 0.5, dtype)
+    eps = jnp.finfo(dtype).eps
+    valid = rules.mu3_importance_update(bank, z, goal, mean)
+    assert int(valid[-1]) == 0
+    expected_values = (mean, 0, 1 / len(bank), 0, 0, 0, len(bank))
+    for value, expected in zip(valid[:-1], expected_values, strict=True):
+        np.testing.assert_allclose(value, expected, atol=64 * eps, rtol=64 * eps)
+
+    broken = [
+        bank.at[0, 0, 1].set(value)
+        for value in (jnp.nan, jnp.inf, -jnp.inf, -eps, 256 * eps)
+    ]
+    for malformed in broken:
+        scores = rules.mu3_log_message(malformed, z, goal, mean)
+        assert np.isnan(scores[0])
+        assert np.isfinite(scores[1:]).all()
+        assert int(rules.mu3_importance_update(malformed, z, goal, mean)[-1]) == 2
+
+    near_unit = bank.at[0, 0, 1].set(64 * eps)
+    # Promoting the score to f64 still admits f32 sampling roundoff.
+    mixed = rules.mu3_importance_update(near_unit, z, goal, mean.astype(jnp.float64))
+    assert int(mixed[-1]) == 0
+    batched = jax.jit(jax.vmap(
+        rules.mu3_importance_update, in_axes=(0, None, None, None)
+    ))
+    result = batched(jnp.stack([bank, near_unit, *broken]), z, goal, mean)
+    np.testing.assert_array_equal(result[-1], [0, 0, *([2] * len(broken))])
+    for lanes, direct in zip(result[:-1], valid[:-1], strict=True):
+        np.testing.assert_allclose(lanes[0], direct, atol=64 * eps, rtol=64 * eps)
+    np.testing.assert_array_equal(result[2][2:], 0)
+    np.testing.assert_array_equal(result[-2][2:], 0)
+
+
+@pytest.mark.parametrize("dtype", (jnp.float32, jnp.float64))
+def test_large_common_score_keeps_normalized_weights_and_restorable_ledger(dtype):
+    from cffg._agent_mu3 import _validate_evaluator_state
+
+    # Two equiprobable particles remain. The common score loses log(2) when
+    # rounded, but the KL against the four original particles is still log(2).
+    winner = jnp.array([[0.25, 0.25], [0.75, 0.75]], dtype)
+    particles = jnp.stack([winner, winner, 1 - winner, 1 - winner])
+    goal = jnp.array([[-1 / jnp.finfo(dtype).eps**2, 0]], dtype)
+    z = jnp.full((1, 2), 0.5, dtype)
+    update = rules.mu3_importance_update(particles, z, goal, particles.mean(axis=0))
+    assert int(update[-1]) == 0
+    np.testing.assert_array_equal(update[2], [0.5, 0.5, 0, 0])
+    np.testing.assert_array_equal(update[3], update[4])
+    assert float(update[5]) == pytest.approx(np.log(2))
+    assert float(update[6]) == pytest.approx(2)
+
+    engine = _engine(samples=4)
+    state = engine.init_state()
+    plan = engine.arena.mu3_groups[0]
+    params = dict(state.params)
+    params[plan.name + ":samples"] = particles
+    names = ("weights", "log_normalizer", "expected_phi", "kl", "ess", "status")
+    for name, value in zip(names, update[2:], strict=True):
+        params[plan.name + ":" + name] = value
+    params[plan.gfe_name + ":Abar"] = update[0][None]
+    params[plan.gfe_name + ":hbar"] = update[1][None]
+    _validate_evaluator_state(_replace(state, params=params), plan, RunStatus.CONVERGED)
+    params[plan.name + ":kl"] = 2 * update[5]
+    with pytest.raises(ValueError, match="ledger"):
+        _validate_evaluator_state(_replace(state, params=params), plan, RunStatus.CONVERGED)
 
 
 def test_mu3_float32_positive_predictive_underflow_is_not_zero_support():

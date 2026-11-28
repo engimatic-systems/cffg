@@ -14,6 +14,7 @@ from cffg import efrules
 from cffg._constraint_checkpoint import restore_legacy_constraint_arrays
 from cffg.engine import Engine, RunResult, RunStatus, State, _replace
 from cffg.outer import OuterTerminationReason
+from cffg.rules import mu3_particle_tolerance
 
 
 _STATE_FIELDS = tuple(field.name for field in fields(State))
@@ -638,9 +639,7 @@ def _validate_evaluator_state(state: State, plan, status: RunStatus) -> None:
     tolerance = 256.0 * np.finfo(dtype).eps * max(1.0, np.sqrt(samples.shape[0]))
     if (
         np.any(samples < 0)
-        or not np.allclose(
-            samples.sum(axis=1), 1.0, rtol=tolerance, atol=tolerance
-        )
+        or np.any(np.abs(samples.sum(axis=1) - 1) > mu3_particle_tolerance(dtype))
         or np.any(weights < 0)
         or not np.isclose(weights.sum(), 1.0, rtol=tolerance, atol=tolerance)
     ):
@@ -687,6 +686,16 @@ def _validate_evaluator_state(state: State, plan, status: RunStatus) -> None:
     ledger_consistent = np.isclose(
         kl, expected_phi - log_normalizer, rtol=tolerance, atol=tolerance
     )
+    if not ledger_consistent:
+        # The stored scores can round to the same float even for a nonzero
+        # KL. The weights independently determine KL against uniform samples.
+        rounding = np.finfo(dtype).eps * max(abs(expected_phi), abs(log_normalizer))
+        positive = weights[weights > 0].astype(np.float64)
+        weight_kl = np.sum(positive * np.log(positive * weights.size))
+        ledger_consistent = (
+            abs(kl - (expected_phi - log_normalizer)) <= rounding
+            and np.isclose(kl, weight_kl, rtol=tolerance, atol=tolerance)
+        )
     uniform_weights = np.array_equal(
         weights, np.full_like(weights, 1.0 / samples.shape[0])
     )

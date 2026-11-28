@@ -768,14 +768,10 @@ multiple refreshed policy-score epochs automatically: callers may explicitly
 refresh, while `Engine.score_mu3_epochs` remains the averaging API. Arbitrary
 stochastic factor families and batched per-agent keys remain future work.
 
-**S2a. Fixed mu3 particle validation has a known hole.** The low-level
-importance rule can treat a NaN inside a caller-supplied fixed particle as
-absent support and report success with a NaN returned moment. Public
-`Engine.run` separately rejects non-finite initial state leaves, so no false
-public convergence path has been demonstrated, but direct rule consumers must
-prevalidate particles as finite, nonnegative probability tables. Ticket
-cff-6n9c owns the direct and jitted rule-level repair. This is a defect, not a
-supported sparse-support convention.
+Fixed mu3 particles must contain finite, nonnegative probabilities. Preparation,
+the importance rule, and checkpoint restore require each outcome column to sum
+to one within 128 machine epsilons of the particle dtype. Exact zeros are valid.
+A malformed particle makes its entire importance update diverge.
 
 The agent's fixed-memory trial loop likewise uses separate immutable planning
 and filtering templates. It does not mutate the paper's literal graph when an
@@ -910,8 +906,8 @@ and learns identities, motions and interactions within fixed-capacity banks.
 Its evaluation includes one 10,000-step Explode run. The usual LAIF controller
 replans at each tick. The separate categorical planner in S4 can commit to
 actions through one or two future readings. Loopy inference retains its
-convergence and accuracy caveats. Treat cff-34gi and cff-6n9c as input-
-validation defects, the estimator and stochastic Colony surfaces as partial,
+convergence and accuracy caveats. Treat cff-34gi as an input-validation defect,
+the estimator and stochastic Colony surfaces as partial,
 alpha bundles as current-schema artifacts, and administratively closed research
 chains as non-capabilities. Its natural habitat remains experiments whose state
 ontology and local factor semantics can be designed and audited explicitly.
