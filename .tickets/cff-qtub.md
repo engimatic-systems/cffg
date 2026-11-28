@@ -61,3 +61,7 @@ Implemented the cached prepare/resolve split on the published main base. A succe
 **2026-11-28T04:34:33Z**
 
 Combined with cff-b2fz on the #208 integration branch. Cached binding uses the same shared-ownership check and copy-specific BlobRef construction as fresh grounding. An integration regression restores a scoped compact template from JSON, changes its tied initializer, overrides one copy with sparse support and binds one sensor. It compares all packed parameters, observation messages and learning plans to fresh flat compilation, checks the original member remains independent and rejects inconsistent shared source paths on a cache hit.
+
+**2026-11-28T05:19:01Z**
+
+Combined gate on #208 code revision 34374ae passed. The canonical dashboard recorded 2,866 passing cases, zero failures, four workers, 451.364 s wall. Isolated follow-up 1908dd3 fixes a missing import in the standalone benchmark argument parser; its --help check passes. It changes no library code, pytest configuration or outcome interpretation. The source owner is running the comparative timings separately.
