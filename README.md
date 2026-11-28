@@ -135,13 +135,13 @@ as `cffg.learn`, `cffg.conj`, `cffg.colony`, `cffg.csp`, and `cffg.estimate`
 expose the specialized workflows named in the capability map.
 
 <details>
-<summary><code>cffg</code> — daily workflow and extension primitives (38)</summary>
+<summary><code>cffg</code> — daily workflow and extension primitives (40)</summary>
 
 <!-- facade-cffg:start -->
 `CorridorEnv`, `DiscreteBinding`, `DiscreteMode`, `EFBinding`, `Engine`,
 `FactorKernel`, `FailureDiagnostic`, `FixedPointDifferentiator`, `FixedPointGradient`, `FunctionSpec`,
 `GaussianAmortizer`, `GaussianBinding`, `GaussianConditioning`, `GradientStatus`,
-`HostileInputs`, `LoadedBundle`, `MeanImplementation`, `NeuralTrainer`,
+`HostileInputs`, `LoadedBundle`, `MNIW`, `MeanImplementation`, `NIW`, `NeuralTrainer`,
 `ParameterSpec`, `PersistentArray`, `PersistentParameter`,
 `PersistentStateDescriptor`, `PersistentTarget`, `PolynomialFeatures`,
 `RollingAgent`, `RunStatus`, `TrainingConfig`, `build_gridworld`,

@@ -21,6 +21,7 @@ EXAMPLES = {
     "examples/exponential_family.py",
     "examples/finite_hypotheses.py",
     "examples/hard_constraint.py",
+    "examples/joint_gaussian_draws.py",
     "examples/hybrid_rslds.py",
     "examples/learning_bundle.py",
     "examples/linear_gaussian.py",
