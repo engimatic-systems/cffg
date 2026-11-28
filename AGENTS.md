@@ -94,28 +94,27 @@ This project will span many context windows. The rule that makes that survivable
   changed component. After a failing case passes, run a targeted suite of
   related cases when useful to check the fix and nearby behavior.
 - **Final validation for code outside the isolated-tooling exception below**
-  requires one passing short-suite run after the final code change.
-  One passing suite at the proposed PR head is
-  sufficient to open or update a PR. Before launching or waiting on it, inspect
-  only `latest.wall_seconds` and `suggested_wait_seconds` in
-  `tools/test-suite-runtimes.json` for measured wall time and a wait budget
-  with headroom. If the focused tests passed before, then don't poll the full
-  test suite. Instead just wait for the `suggested_wait_seconds` time.
-  **Test-suite waits are an explicit exception to general guidance to send
-  frequent progress updates, including once-per-minute check-ins.** Announce
-  the suite launch and wait budget once, then wait quietly for the full
-  `suggested_wait_seconds`: no periodic commentary and no polling the process,
-  logs, or dashboard. Run
-  `uv run python tools/dashboard.py --run-suite` to execute the default
-  `not slow` pytest selection exactly once
-  and refresh both that runtime history and `~/agent-share/cffg-tests.html`
-  (add new test files to `EPIC_FILES`). If the short suite was run directly,
-  preserve and reuse its
-  result: `uv run pytest -q --junitxml=/tmp/cffg-tests.xml`, then
-  `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`. Opening a
-  PR, requesting review, or refreshing the dashboard never calls for a second
-  unchanged short-suite run. A later change requiring this gate supersedes the
-  previous result and gets one fresh final run.
+  requires one passing `uv run python tools/dashboard.py --run-suite` after
+  the final code change. It runs the full `not slow` selection, records wall
+  time and refreshes `~/agent-share/cffg-tests.html`. Add new test files to
+  `EPIC_FILES`. The dashboard uses four pytest workers with whole-file
+  scheduling on Apple silicon Macs reporting at least 12 logical CPUs and
+  64 GiB of RAM. It defaults to serial execution elsewhere or when the host
+  size is unknown. Add `--workers 1` for the serial reference.
+  Both modes require successful process exit and complete results for every
+  selected test. A failed worker or incomplete collection fails the gate.
+- **Wait for the suite process to exit.** Before launch, read only
+  `latest.wall_seconds` and `suggested_wait_seconds` in
+  `tools/test-suite-runtimes.json`. Announce the launch and wait budget once,
+  then wait quietly on the process completion event. Use the suggested duration
+  as timeout headroom. Read the result as soon as the process exits. If a wait
+  times out while the process is running, continue waiting on the same run.
+  Skip periodic status messages and polling of the process, logs or dashboard.
+- **Reuse a passing result at the same head** when opening or updating a PR.
+  If a complete passing short suite already produced a JUnit report, refresh
+  the dashboard with `uv run python tools/dashboard.py --junitxml /tmp/cffg-tests.xml`
+  using that report's path. A later code change requiring the gate gets a
+  fresh final run.
 - **Isolated tooling changes** use focused tests and changed-artifact checks
   instead of the full short suite. Examples include runtime-history storage,
   developer reports, and formatting helpers. Record the isolation rationale,
@@ -125,7 +124,11 @@ This project will span many context windows. The rule that makes that survivable
   still require the full gate. If isolation is uncertain, use the full gate.
   Validate after the final relevant edit; never publish focused results as if
   they were a fresh full-suite result.
-- **Short-suite time budget:** Keep the default short suite within 20 minutes (1,200 seconds); if a completed run exceeds that budget, use its per-test timings to remove lower-value tests or move expensive cases to the opt-in slow suite until the estimated remaining runtime is under budget, retain required correctness and numerical robustness coverage, record both the measured and estimated totals, and reuse the passing result without rerunning solely for those test removals or selection changes.
+- **Short-suite time target.** Aim for an end-to-end wall time under 600 seconds
+  on the qualified host. Assess the target using a measured, complete dashboard
+  run. If it misses, use per-test timings to address the cost while preserving
+  required correctness and numerical robustness coverage. Report estimates
+  separately and consult Cooper before trading coverage for speed.
 - **Slow tests are opt-in.** Mark long behavioral, multi-trial, and globalization
   regressions with `@pytest.mark.slow`; pytest excludes them by default. Run
   them explicitly with `uv run pytest -m slow` only when the changed behavior
