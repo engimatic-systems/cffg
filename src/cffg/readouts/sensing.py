@@ -94,6 +94,8 @@ class _PathBeliefs:
                 if not _card(edge):
                     continue
                 a, b = self.message(edge.slot0), self.message(edge.slot1)
+                if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
+                    raise ValueError(f"nonfinite message on edge {name!r}")
                 zero = np.asarray(NEG, dtype=a.dtype)
                 live = (a != zero) & (b != zero)
                 for constraint in children[vertex].values():

@@ -260,3 +260,7 @@ The names and numerical ownership of the GFE ledger have been implemented at 04e
 **2026-11-28T06:14:23Z**
 
 Implemented the public tree readout. A four-way oracle comparison (two schedules and both precisions) agreed with direct enumeration. With 64 class labels and 64 sensors the complete score ordering matched independent naive Bayes. Tests also cover contradictory side observations, absence of support, malformed messages, singleton missing versus observed data, and a damped five-category sensor. The 86 focused readout, compiler assembly and README checks passed on the final source. The full short-suite gate and open review PR remain.
+
+**2026-11-28T06:17:10Z**
+
+The component support check now checks finiteness in both message directions before admitting an edge. A single NaN in the outgoing message at a missing sensor is rejected and names the affected pair. All 87 focused checks pass. The preceding queued revision was withdrawn before pytest started.

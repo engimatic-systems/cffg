@@ -9,7 +9,8 @@ from test_constraint_data import constraint_model
 from test_dirichlet_param_edges import _make_template
 from test_gaussian_tap_execution import chain
 from test_gfe import K, M, make_model
-from test_sensing_information import make_engine
+from cffg.runtime_types import _replace
+from test_sensing_information import make_engine, rejection_model
 from test_vmp import A, D, make_conjugate
 
 
@@ -70,3 +71,13 @@ def test_cycle_in_query_component():
     engine = make_engine(t, {"mix": np.full((2, 2, 2), .5), "back": np.eye(2)}, np.float64)
     with pytest.raises(ValueError, match="acyclic"):
         engine.eig(engine.init_state(), "x", ["reading"])
+
+
+def test_one_invalid_outgoing_value_at_missing_sensor_is_rejected():
+    engine = rejection_model()
+    state = engine.init_state()
+    edge = engine.arena.edges["sensor"]
+    index = engine.arena.message_indices(edge.slot0, edge.card)[0]
+    corrupted = _replace(state, messages=state.messages.at[index].set(np.nan))
+    with pytest.raises(ValueError, match="nonfinite.*sensor"):
+        engine.eig(corrupted, "query", ["sensor"])
