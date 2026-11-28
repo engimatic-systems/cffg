@@ -676,6 +676,11 @@ worth remembering:
 - **One damp knob.** Linear damping on (eta, Lambda) *is* log-space damping
   for Gaussians, so the engine's damp parameter acts uniformly across
   families.
+- For resolved proper inputs, square invertible affine maps use QR of
+  covariance roots for prediction. Partial inputs use the Gaussian likelihood
+  on its supported directions. The affine node ledger evaluates
+  `−H[q(x)] + E_x KL(q(y|x) || p(y|x))`, which gives the same local Bethe
+  term while avoiding cancellation between state and process-noise moments.
 - The Kalman test tier (`tests/test_kalman.py`) mirrors the HMM tier
   exactly: smoother parity, tree-identity FE, missing data, vmap batching.
 

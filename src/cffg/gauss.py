@@ -28,7 +28,9 @@ FORWARD (marginalize x against mu_in = (η_i, Λ_i)):
     still forming (vacuous Λ_i, rank-deficient A), so the implementation
     eliminates the input in a balanced joint least-squares system using
     the left null space of its design. For invertible square A a change of
-    variables z=Ax reduces prediction to the same convolution as below.
+    variables z=Ax reduces partial-information prediction to the same convolution
+    as below. For a resolved proper input, QR of stacked covariance roots
+    computes the positive sum V + A Λ_i⁻¹ Aᵀ directly.
 
 BACKWARD (marginalize y against mu_out = (η_o, Λ_o)):
     mu(x) = ∫ f(y,x) mu_out(y) dy.  Quadratic in y with curvature W + Λ_o
@@ -60,8 +62,10 @@ NODE ENERGIES  F[q_a] = E_{q_a}[log q_a − log f_a],  q_a ∝ f_a · Π incomin
     and E_q[log N(r; 0, V)] = ½ log det W − d/2 log 2π − ½ (r̄ᵀWr̄ + tr(WΣ_r)).
     The `gaussian_linear` joint belief q(y,x) has precision
         Λ_j = [[W+Λ_o, −WA], [−AᵀW, AᵀWA+Λ_i]],   η_j = [Wb+η_o, −AᵀWb+η_i]
-    (read the exponent of f·mu_o·mu_i), and the residual r = y − Ax − b has
-    r̄ = J m_j − b, Σ_r = J Σ_j Jᵀ with J = [I, −A]. Equality nodes carry
+    (read the exponent of f·mu_o·mu_i). Equivalently, its local free energy is
+    −H[q(x)] + E_x KL(q(y|x) || f(y|x)). Conditioning first computes the
+    mean and variance of the process residual directly, even when y and Ax
+    are nearly identical. Equality nodes carry
     −H[q] with log f = 0 on their support, mirroring the discrete rule; the
     Bethe edge-entropy correction (+H per interior edge, engine.py) then
     makes F = −log Z exact on trees — the continuous tree identity that the
@@ -162,6 +166,40 @@ def _likelihood_axes(eta, precision):
     return roots, axes, scale, natural
 
 
+def _resolved_precision(l):
+    # The source-dtype correlation guard selects a factorization. The matrix
+    # entering the calculation is always unshifted.
+    scale = jnp.sqrt(jnp.where(jnp.diag(l) > 0, jnp.diag(l), 1.))
+    correlation = (l / scale[:, None]) / scale[None, :]
+    identity = jnp.eye(len(l), dtype=l.dtype)
+    return jnp.isfinite(jnp.linalg.cholesky(
+        correlation - len(l) * jnp.finfo(l.dtype).eps * identity
+    )).all()
+
+
+def _proper_channels(e, l):
+    root = jnp.linalg.cholesky(l)
+    target = jax.lax.linalg.triangular_solve(root, e[:, None], left_side=True, lower=True)
+    return root.T, target[:, 0], jnp.zeros_like(e)
+
+
+def _support_rows(precision):
+    """A basis for the source-resolved likelihood directions, in input units."""
+    scale = jnp.sqrt(jnp.where(jnp.diag(precision) > 0, jnp.diag(precision), 1.))
+    values, axes = jnp.linalg.eigh((precision / scale[:, None]) / scale)
+    cutoff = len(precision) * jnp.finfo(precision.dtype).eps * values[-1]
+    return jnp.where((values > cutoff)[:, None], axes.T * scale, 0.)
+
+
+def _spans_input(li, lo, a):
+    # Process noise provides no information in an input direction invisible
+    # to both cavities. Test the design before squaring its singular values.
+    design = jnp.vstack((_support_rows(li), _support_rows(lo) @ a))
+    scale = jnp.max(abs(design), axis=0)
+    singular = jnp.linalg.svd(design / jnp.where(scale > 0, scale, 1.), compute_uv=False)
+    return singular[-1] > max(design.shape) * jnp.finfo(a.dtype).eps * singular[0]
+
+
 def _observed_affine(channel, target, flat, a, b, w):
     """Integrate those channels against N(y; Ax+b, W⁻¹), returning a Gram precision."""
     chol = jnp.linalg.cholesky(w)
@@ -198,7 +236,7 @@ def _valid_affine(e, l, a, b, w):
     return _pd_ok(w) & _psd_ok(l) & jnp.isfinite(a).all() & jnp.isfinite(b).all() & jnp.isfinite(e).all()
 
 
-def _channel_data(e, l):
+def _spectral_channels(e, l):
     roots, axes, scale, natural = _likelihood_axes(e, l)
     channel = (roots[:, None] * axes.T) * scale[None, :]
     flat = scale * (axes @ jnp.where(roots == 0, natural, 0.))
@@ -207,11 +245,30 @@ def _channel_data(e, l):
 
 
 def _inverse_map_forward(e, l, a, b, w):
-    channel, target, flat = _channel_data(e, l)
+    channel, target, flat = _spectral_channels(e, l)
     transformed = jnp.linalg.solve(a.T, jnp.column_stack((channel.T, flat)))
     result = _observed_affine(transformed[:, :-1].T, target, transformed[:, -1],
                              jnp.eye(len(e), dtype=e.dtype), -b, w)
     return tuple(jnp.where(_valid_affine(e, l, a, b, w), out, 0.) for out in result)
+
+
+def _proper_forward(e, l, a, b, w):
+    # A root of the predicted covariance is [A L^-T, C^-T], where
+    # L L^T is the input precision and C C^T is the noise precision.
+    root = jnp.linalg.cholesky(l)
+    rhs = jnp.column_stack((a.T, e))
+    solved = jax.lax.linalg.triangular_solve(root, rhs, left_side=True, lower=True)
+    transformed = solved[:, :-1].T
+    mean = transformed @ solved[:, -1] + b
+    identity = jnp.eye(len(b), dtype=w.dtype)
+    noise = jax.lax.linalg.triangular_solve(
+        jnp.linalg.cholesky(w), identity, left_side=True, lower=True,
+    )
+    r = jnp.linalg.qr(jnp.vstack((transformed.T, noise)), mode="r")
+    whiten = jax.lax.linalg.triangular_solve(r.T, identity, left_side=True, lower=True)
+    eta, precision = whiten.T @ (whiten @ mean), whiten.T @ whiten
+    ok = _valid_affine(e, l, a, b, w)
+    return jnp.where(ok, eta, 0.), jnp.where(ok, precision, 0.)
 
 
 @jax.custom_jvp
@@ -249,7 +306,12 @@ def linear_forward(eta_i, lam_i, a, b, w):
     if a.shape[-1] == a.shape[-2]:
         sign, logdet = jnp.linalg.slogdet(a)
         invertible = jnp.all((sign != 0) & jnp.isfinite(logdet))
-        return jax.lax.cond(invertible, lambda xs: jax.vmap(_inverse_map_forward)(*xs),
+
+        def square(e, l, a, b, w):
+            return jax.lax.cond(_resolved_precision(l), _proper_forward, _inverse_map_forward,
+                                e, l, a, b, w)
+
+        return jax.lax.cond(invertible, lambda xs: jax.vmap(square)(*xs),
                             lambda xs: jax.vmap(one)(*xs), args)
     return jax.vmap(one)(*args)
 
@@ -261,7 +323,9 @@ def linear_backward(eta_o, lam_o, a, b, w):
     def one(eo, lo, A, bb, W):
         # Factor Λo = BᵀB in unit-scaled coordinates. A singular likelihood
         # contributes ordinary scalar observations on its supported directions.
-        channel, target, flat = _channel_data(eo, lo)
+        channel, target, flat = jax.lax.cond(
+            _resolved_precision(lo), _proper_channels, _spectral_channels, eo, lo
+        )
         eta, lam = _observed_affine(channel, target, flat, A, bb, W)
         exact_vacuous = (lo == 0).all() & (eo == 0).all()
         lam = jnp.where(exact_vacuous, jnp.zeros_like(lam), lam)
@@ -345,23 +409,36 @@ def linear_energy(eta_o, lam_o, eta_i, lam_i, a, b, w):
     """gaussian_linear (unobserved): joint belief over (out, in)."""
 
     def one(eo, lo, ei, li, A, bb, W):
-        do, di = A.shape
-        lam_j = jnp.block([[W + lo, -W @ A], [-A.T @ W, A.T @ W @ A + li]])
-        eta_j = jnp.concatenate([W @ bb + eo, -A.T @ W @ bb + ei])
-        sig_j = _pd_inverse(lam_j)
-        m_j = _pd_solve(lam_j, eta_j)
-        j = jnp.concatenate([jnp.eye(do, dtype=W.dtype), -A], axis=1)  # r = J[y;x] − b
-        r = j @ m_j - bb
-        sig_r = j @ sig_j @ j.T
-        logdet_w = _pd_logdet(W)
-        e_logf = 0.5 * logdet_w - 0.5 * do * _LOG2PI - 0.5 * (
-            r @ W @ r + jnp.trace(W @ sig_r)
+        # q(y|x) has precision D and conditional mean Ax+b+shift-residual_map@x.
+        # Factor the joint entropy as H(x)+H(y|x). This keeps the small
+        # process residual out of the difference of two large state moments.
+        di = A.shape[1]
+        D = W + lo
+        observation_eta = eo - lo @ bb
+        rhs = jnp.column_stack((W @ A, lo @ A, observation_eta, lo))
+        output_map, residual_map, shift, fraction = jnp.split(
+            _pd_solve(D, rhs), (di, 2 * di, 2 * di + 1), axis=1
         )
-        val = _neg_entropy(lam_j) - e_logf
-        ok = _pd_ok(W) & _pd_ok(lam_j) & jnp.isfinite(val)
+        residual_quadratic = residual_map.T @ W @ residual_map
+        lam_x = li + output_map.T @ lo @ output_map + residual_quadratic
+        eta_x = ei + output_map.T @ observation_eta
+        moments = _pd_solve(lam_x, jnp.column_stack((eta_x, jnp.eye(di, dtype=W.dtype))))
+        r = shift[:, 0] - residual_map @ moments[:, 0]
+        # tr(W D^-1)-do = -tr(D^-1 lo).
+        kl = 0.5 * (
+            _pd_logdet(D) - _pd_logdet(W) - jnp.trace(fraction)
+            + r @ W @ r + jnp.trace(residual_quadratic @ moments[:, 1:])
+        )
+        val = _neg_entropy(lam_x) + kl
+        ok = _pd_ok(W) & _pd_ok(D) & _pd_ok(lam_x) & jnp.isfinite(val)
         return jnp.where(ok, val, jnp.inf)
 
-    return jax.vmap(one)(eta_o, lam_o, eta_i, lam_i, a, b, w)
+    values = jax.vmap(one)(eta_o, lam_o, eta_i, lam_i, a, b, w)
+    resolved = jax.vmap(_resolved_precision)(lam_i)
+    return jax.lax.cond(
+        jnp.all(resolved), lambda: values,
+        lambda: jnp.where(resolved | jax.vmap(_spans_input)(lam_i, lam_o, a), values, jnp.inf),
+    )
 
 
 def linear_observed_energy(eta_i, lam_i, y, mask, a, b, w):

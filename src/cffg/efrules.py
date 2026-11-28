@@ -427,10 +427,15 @@ class JGaussianFamily(JNaturalParameterFamily):
         return eta, precision
 
     def from_natural(self, natural):
-        eta, precision = natural
-        covariance = _pd_inverse(precision)
-        mean = jnp.einsum("...ij,...j->...i", covariance, eta)
-        return mean, covariance
+        eta, precision = map(jnp.asarray, natural)
+        if eta.shape[:-1] != precision.shape[:-2] or eta.dtype != precision.dtype:
+            return self.mean((eta, precision)), _pd_inverse(precision)
+        identity = jnp.broadcast_to(
+            jnp.eye(precision.shape[-1], dtype=precision.dtype), precision.shape
+        )
+        rhs = jnp.concatenate((eta[..., None], identity), axis=-1)
+        solved = _pd_solve(precision, rhs)
+        return solved[..., 0], solved[..., 1:]
 
     def log_partition(self, natural):
         eta, precision = natural
@@ -448,7 +453,13 @@ class JGaussianFamily(JNaturalParameterFamily):
         return mean, -0.5 * second
 
     def mean(self, natural):
-        return self.from_natural(natural)[0]
+        eta, precision = map(jnp.asarray, natural)
+        batch = jnp.broadcast_shapes(eta.shape[:-1], precision.shape[:-2])
+        dtype = jnp.result_type(eta, precision)
+        return _pd_solve(
+            jnp.broadcast_to(precision, batch + precision.shape[-2:]).astype(dtype),
+            jnp.broadcast_to(eta, batch + eta.shape[-1:]).astype(dtype),
+        )
 
     def negative_entropy_from_precision(self, precision):
         dimension = precision.shape[-1]
@@ -483,8 +494,7 @@ class JGaussianFamily(JNaturalParameterFamily):
     def moments(self, natural):
         eta, precision = natural
         proper = self.is_proper(natural)
-        covariance = _pd_inverse(precision)
-        mean = jnp.einsum("...ij,...j->...i", covariance, eta)
+        mean, covariance = self.from_natural(natural)
         return (
             jnp.where(proper[..., None], mean, jnp.nan),
             jnp.where(proper[..., None, None], covariance, jnp.nan),

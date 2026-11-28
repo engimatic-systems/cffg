@@ -526,9 +526,9 @@ declarations. [Gaussian agent fixture](tests/test_gaussian_agent.py)
 An exact-tree certificate checks message consistency, not posterior accuracy.
 Choose float64 for tight moment or evidence comparisons, especially with widely
 different variances. The retained PCGym first-order controller certifies in both
-precisions, but float32 still loses accuracy in its information-form messages
-and readouts. Its tests separately check posterior-scaled moments and evidence;
-the bounded precision contract is in [Gaussian numerics](docs/LIMITATIONS.md#soft-limitations).
+precisions. Its conditioned and fully unobserved tests independently bound
+posterior-scaled moment errors and relative evidence-weight error by the
+square root of machine epsilon. [Gaussian numerics](docs/LIMITATIONS.md#soft-limitations)
 
 Gamma–Poisson and Beta–Bernoulli graphs use scalar natural-parameter messages.
 Observation factors are conditioned leaves; unobserved Poisson or Bernoulli
