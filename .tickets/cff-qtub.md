@@ -1,6 +1,6 @@
 ---
 id: cff-qtub
-status: in_progress
+status: closed
 deps: [cff-v6th]
 links: []
 created: 2026-09-25T03:46:25Z
@@ -65,3 +65,7 @@ Combined with cff-b2fz on the #208 integration branch. Cached binding uses the s
 **2026-11-28T05:19:01Z**
 
 Combined gate on #208 code revision 34374ae passed. The canonical dashboard recorded 2,866 passing cases, zero failures, four workers, 451.364 s wall. Isolated follow-up 1908dd3 fixes a missing import in the standalone benchmark argument parser; its --help check passes. It changes no library code, pytest configuration or outcome interpretation. The source owner is running the comparative timings separately.
+
+**2026-11-28T06:03:19Z**
+
+The standalone comparison at a774a54 and 8cd52df ran three synchronized CPU x64 repetitions per size on the retained CSTR P4/H15 geometry with synthetic affine transitions. Topology and Arena assembly counts for 1, 40 and 400 members fell from 1, 40 and 400 to one each. All state, trace and residual digests matched. Median total spawn was 89.6 to 93.4 ms for one, 3.482 to 0.1457 s for 40 and 35.253 to 0.6681 s for 400. The latter two improvements were 23.9× and 52.8×. At 400, binding was 33.4 to 33.9 ms, first inference 4.482 to 4.666 s, and warmed exact inference 1.020 to 1.081 s. This comparison measures setup on the synthetic fixture. The complete samples and provenance are in ~/agent-share/cffg-backlog-gates/colony-spawn-8cd52df.json. The integrated #217 runtime at 34374ae passed the canonical dashboard gate with 2,866 passing cases and zero failures. The isolated parser correction changed only the benchmark tool.
