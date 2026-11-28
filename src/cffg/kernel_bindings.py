@@ -163,7 +163,15 @@ class GaussianBinding(ImmutableRecord):
     # Configured Taylor means expose (Jacobian, value) at a live input and parameter row.
     taylor_linearize: Callable | None = None
     centered_statistics: Callable | None = None
+    point_trainable: bool | None = None
     arena: str = field(default="gaussian", init=False)
+
+    @property
+    def supports_point_training(self) -> bool:
+        # Existing registrations identified trainable means by this work count.
+        if self.point_trainable is None:
+            return "network_parameters" in self.work
+        return self.point_trainable
 
     @property
     def constraint_modes(self) -> frozenset[str]:

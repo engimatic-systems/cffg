@@ -87,16 +87,16 @@ example.
 | [Use GFE and parameter epistemics](#discrete-planning-and-rolling-agents) | `ConstraintKind.P_SUBSTITUTION`; `prepare_mu3`; `score_mu3_epochs`; builder flags | Observation epistemics, learned goals, finite-sample mu3(A), transition novelty | Policy posterior, ESS/support facts, specialized diagnostics | GFE; transition novelty is an optimistic bound | [discrete_rollout.py](examples/discrete_rollout.py) | **Bounded:** explicit PRNG keys; open validation defects are listed in `LIMITATIONS.md` |
 | [Run a receding-horizon agent](#discrete-planning-and-rolling-agents) | `RollingAgent` | Plan, act, observe, learn, roll a fixed-memory boundary | Action, beliefs, learning state, checkpoint | Replans a finite-horizon factorized policy each tick | [discrete_agent.py](examples/discrete_agent.py) | **Ready:** environment state is external; deep plans need status/trace checks |
 | [Run the costly-cue behavioral oracle](#discrete-planning-and-rolling-agents) | `cffg.experiments.behavioral_epistemics.run_benchmark` | Fixed active-inference versus BFE-ablation task | `BehavioralReport` | Bounded scientific regression, not a general inference objective | [API pattern](#discrete-planning-and-rolling-agents) | **Research-only:** fixed task and no supported package facade or reuse guarantee |
-| [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-NIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [learning_bundle.py](examples/learning_bundle.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
+| [Learn declared parameters](#learn-and-swap-parameters) | `cffg.learn.Learnables`; `cffg.conj`; `LearnableSpec` | Dirichlet, NIW, MNIW, component-NIW, component-MNIW, Pólya–Gamma | `expected`, `rollover`, persistent posterior state | Between-trial conjugate or empirical-Bayes updates | [Bundle](examples/learning_bundle.py), [tied affine](examples/continuous_control.py), [per-arm](examples/hybrid_control.py) | **Ready:** `accumulate` and `replace` have different trial semantics; not full joint VB |
 | [Update a finite parameter bank](#finite-parameter-hypotheses) | `cffg.finite_hypotheses.FiniteHypotheses` | Fixed candidate rows and observed Gaussian factors | Posterior log weights and cumulative log evidence | Exact sum over the declared candidates | [finite_hypotheses.py](examples/finite_hypotheses.py) | **Ready:** requires a conditional likelihood for each candidate |
 | [Persist and continue](#persist-and-resume) | `save_bundle`; `load_bundle`; agent checkpoints | Template, arrays, declared learning, or rolling-agent runtime | `LoadedBundle`, restored agent | Serialization preserves declared identity; no inference objective | [learning_bundle.py](examples/learning_bundle.py) | **Ready/current schema:** a bundle is not a mid-run snapshot; stable historical migration is open |
-| [Run linear-Gaussian inference](#continuous-exponential-family-and-hybrid-models) | `cffg.models.lgssm` | Gaussian and linear-Gaussian BP with missing observations | `gaussian_marginals`, node statistics, BFE | Exact Kalman/RTS marginals and evidence identity on a tree | [linear_gaussian.py](examples/linear_gaussian.py) | **Ready:** positive-definite covariance contract; scaled readout is still host-loop bound |
+| [Run linear-Gaussian inference](#continuous-exponential-family-and-hybrid-models) | `cffg.models.lgssm` | Gaussian and linear-Gaussian BP with missing observations | `gaussian_marginals`, node statistics, BFE | Exact Kalman/RTS marginals and evidence identity on a tree | [Kalman/RTS](examples/linear_gaussian.py), [continuous control](examples/continuous_control.py) | **Ready:** positive-definite covariance contract; scaled readout is still host-loop bound |
 | [Run scalar exponential-family inference](#continuous-exponential-family-and-hybrid-models) | `gamma`, `beta`, `poisson_obs`, `bernoulli_obs`; `ef_marginals` | Conjugate Gamma–Poisson and Beta–Bernoulli BP | Standard parameters, mean, `proper`, BFE | Exact registered tree messages and ledger | [exponential_family.py](examples/exponential_family.py) | **Ready:** conditioned observations only; predictive outputs leave the shipped family |
-| [Run hybrid mixture and recurrence inference](#continuous-exponential-family-and-hybrid-models) | `gaussian_mixture(_linear)`; `recurrence_link`; `gaussian_prec` | Assumed-density mixtures, structured recurrence, Gamma precision | Mixture predictives, pair beliefs, sufficient statistics | Mixture moment collapse and recurrence JJ bound are explicit approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** no exact switching trajectory posterior; partial goals can lose backward influence |
+| [Run hybrid mixture and recurrence inference](#continuous-exponential-family-and-hybrid-models) | `gaussian_mixture(_linear)`; `recurrence_link`; `gaussian_prec` | Assumed-density mixtures, structured recurrence, Gamma precision | Mixture predictives, pair beliefs, sufficient statistics | Mixture moment collapse and recurrence JJ bound are explicit approximations | [rSLDS](examples/hybrid_rslds.py), [hybrid control](examples/hybrid_control.py) | **Bounded:** no exact switching trajectory posterior; partial goals can lose backward influence |
 | [Build or fit an rSLDS](#continuous-exponential-family-and-hybrid-models) | `rslds`; `fit_rslds`; `PCAARHMMInitializer`; rSLDS learning classes | Recurrent switching LDS inference, learning, observed-only fitting | Fit status, attempts, marginals, FE/residual traces | Empirical-Bayes variational fit with declared hybrid/JJ approximations | [hybrid_rslds.py](examples/hybrid_rslds.py) | **Bounded:** budget exhaustion is preserved; no broad recovery-superiority claim |
 | [Use nonlinear Gaussian factors](#nonlinear-and-neural-gaussian-models) | `FunctionSpec`; `register_mean_function`; `moment_matching` | Taylor or fixed sigma-point positive-noise Gaussian factors | Gaussian marginals, `objective_metadata`, `objective_contract` | Frozen-Gaussian surrogate; adaptive consistency is not an evidence bound | [Sensor](examples/nonlinear_gaussian.py), [reactor planning](examples/cstr_planning.py) | **Bounded:** declared reactor inputs; zero noise, nonlinear GFE, and continuous-to-discrete means are unsupported |
 | [Use neural means and fixed-point gradients](#nonlinear-and-neural-gaussian-models) | `neural_mean`; `initialize_neural_parameters`; `FixedPointDifferentiator`; `fixed_point_gradient` | Dense MLP mean inside a positive-noise nonlinear Gaussian factor | Gradient status, adjoint/root residuals, parameter gradient | Local derivative of the certified adaptive root and surrogate ledger | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** local isolated-root assumption; no weight uncertainty or stochastic mu3 |
-| [Train or amortize neural inference](#nonlinear-and-neural-gaussian-models) | `NeuralTrainer`; `TrainingConfig`; `GaussianAmortizer`; `PolynomialFeatures` | Deterministic full-batch Adam and Gaussian recognition initialization | Training/continuation state and proposed Gaussian messages | Optimizes the same approximate adaptive objective | [API pattern](#nonlinear-and-neural-gaussian-models) | **Bounded:** no minibatching, discrete point decisions, or universal speedup claim |
+| [Train physical or neural means and amortize inference](#nonlinear-and-neural-gaussian-models) | `MeanTrainer`, `NeuralTrainer`, `TrainingConfig`, `GaussianAmortizer`, `PolynomialFeatures` | Full-batch Adam point training and Gaussian recognition initialization | Fitted values, optimizer state and proposed Gaussian messages | Differentiates the certified adaptive objective | [Cooling rate](examples/physical_mean_training.py) | **Bounded:** deterministic point estimates and local gradient certificates |
 | [Use hard constraints or MAP](#hard-constraints-and-map) | Constraint factors; `compile_template(..., semiring="max")`; `cffg.csp` | Sum-product CSP marginals or discrete max-product | Marginals/BFE, or `decode` and `objective` | Exact tree partition/MAP identities; loopy max-product is bounded | [hard_constraint.py](examples/hard_constraint.py) | **Ready:** max mode is discrete-only; `alldifferent` is capped at `n, K <= 10` |
 | [Batch matching structures](#batch-extend-render-and-estimate) | `cffg.colony.Colony` | Vmapped iterative states; per-instance exact schedules | One `RunResult` per instance | Each instance keeps its normal engine objective/status | [API pattern](#batch-extend-render-and-estimate) | **Ready/partial:** functional mu3 rejected; exact schedules are per-instance; deterministic mixed GFE offers compiled batching |
 | [Register an ordinary custom factor](#batch-extend-render-and-estimate) | `FactorKernel`; binding classes; `register_kernel` | Single-arena discrete BP/VMP, Gaussian, or scalar EF | Generic marginals, energy, optional `kernel_readouts` | Extension author supplies mathematically valid messages and ledger | [API pattern](#batch-extend-render-and-estimate) | **Pre-1.0 unstable:** specialized/multi-arena variational objects need dedicated engine paths |
@@ -135,13 +135,13 @@ as `cffg.learn`, `cffg.conj`, `cffg.colony`, `cffg.csp`, and `cffg.estimate`
 expose the specialized workflows named in the capability map.
 
 <details>
-<summary><code>cffg</code> — daily workflow and extension primitives (40)</summary>
+<summary><code>cffg</code> — daily workflow and extension primitives (41)</summary>
 
 <!-- facade-cffg:start -->
 `CorridorEnv`, `DiscreteBinding`, `DiscreteMode`, `EFBinding`, `Engine`,
 `FactorKernel`, `FailureDiagnostic`, `FixedPointDifferentiator`, `FixedPointGradient`, `FunctionSpec`,
 `GaussianAmortizer`, `GaussianBinding`, `GaussianConditioning`, `GradientStatus`,
-`HostileInputs`, `LoadedBundle`, `MNIW`, `MeanImplementation`, `NIW`, `NeuralTrainer`,
+`HostileInputs`, `LoadedBundle`, `MNIW`, `MeanImplementation`, `MeanTrainer`, `NIW`, `NeuralTrainer`,
 `ParameterSpec`, `PersistentArray`, `PersistentParameter`,
 `PersistentStateDescriptor`, `PersistentTarget`, `PolynomialFeatures`,
 `RollingAgent`, `RunStatus`, `TrainingConfig`, `build_gridworld`,
@@ -524,6 +524,16 @@ raises before advancing the tick. A checkpoint taken after `propose` also
 retains the outstanding decision. The numerical fixture includes both bundle
 declarations. [Gaussian agent fixture](tests/test_gaussian_agent.py)
 
+A manual one-step planner puts the uncertain current state and free command
+in one Gaussian vector. Binding a future target to an affine goal emission
+changes the command marginal. Read it only after convergence. After acting,
+build the learning record from the measured state, **applied** command and
+measured successor. The recipe binds both endpoints of an ordinary affine
+transition and pools the executed occurrences into one tied matrix-normal
+inverse-Wishart (MNIW) posterior.
+Use `expected(name, role)` to report a posterior mean and `rollover(name, role)`
+to construct the next plan's parameters. [Continuous control recipe](examples/continuous_control.py)
+
 An exact-tree certificate checks message consistency, not posterior accuracy.
 Choose float64 for tight moment or evidence comparisons, especially with widely
 different variances. The retained PCGym first-order controller certifies in both
@@ -545,6 +555,15 @@ exact switching-trajectory inference. The deferred D12 research path described
 in `DERIVATIONS.md` is not a production capability. See
 [examples/hybrid_rslds.py](examples/hybrid_rslds.py).
 
+A finite menu of in-range commands gives a bounded alternative. Bind each
+command's categorical selector, leave the sensor reading missing, and score
+the target under the resulting predictive Gaussian. For learning, bind only
+the applied selector and the new reading at a plain affine DATA emission
+downstream of the mixture. Supply one MNIW prior per component. Exact-zero
+responsibility leaves the unused priors unchanged. The recipe varies the
+positive input-prior variance and checks how the posterior regressor and
+learned slope change. [Hybrid control recipe](examples/hybrid_control.py)
+
 For hybrid control, test that a distant goal actually changes the first action.
 Rank-deficient backward mixture messages currently become vacuous. A goal on
 position alone in a position/velocity model can therefore produce a converged
@@ -560,6 +579,24 @@ moment matching. Noise covariance must be positive definite. The runtime checks
 the complete adaptive residual and energy change, while
 `objective_metadata` labels the surrogate's narrower meaning. See
 [examples/nonlinear_gaussian.py](examples/nonlinear_gaussian.py).
+
+To fit physical constants, register a mean with
+`MeanImplementation(id, version, parameter_shape, evaluate, point_trainable=True)`.
+`parameter_shape(input_dim, output_dim, config)` declares a nonempty flat
+parameter vector. `evaluate(x, parameters, config)` must support JAX
+differentiation in both array arguments. Pass `point_trainable=False` to
+exclude a mean from training-target selection. Existing mean registrations that omit
+the flag retain their legacy `network_parameters` work declaration behavior.
+
+`MeanTrainer(template, arrays, observations)` fits one point value per
+selected parameter coordinate. Repeated factors reading the same blob share
+one update. Call `trainer.step(state).require_applied()` to advance only
+after inference and its derivative certify. The step reports the objective
+at the input parameters. Evaluate the updated state with `trainer.infer(state)`.
+`save_checkpoint` and `load_checkpoint` resume deterministic Adam from
+the original model, initial arrays, data, and configuration. The checkpoint
+moments summarize gradients. For posterior probabilities over a declared
+set of candidate constants, see [finite parameter hypotheses](#finite-parameter-hypotheses).
 
 For a CPU Taylor chain with a Gaussian prior and a linear DATA emission at
 each time, the default engine can solve both message directions in one pass
@@ -1005,9 +1042,12 @@ unfinished result and asserts the quantity an experiment should inspect.
 | [discrete_agent.py](examples/discrete_agent.py) | Bundle, compile/bind/run/read, rolling agent, checkpoint restore | Exact conditioned tree plus registered fixed-A planning |
 | [discrete_rollout.py](examples/discrete_rollout.py) | Generic finite-horizon discrete GFE planning | Supported one-step P-substituted objective |
 | [linear_gaussian.py](examples/linear_gaussian.py) | LGSSM with a missing observation | Exact tree Gaussian marginals and evidence identity |
+| [continuous_control.py](examples/continuous_control.py) | Augmented Gaussian command planning, exact affine DATA taps, tied MNIW from executed transitions | Fixed affine tree and positive-noise goal emission. The actuator clips the proposed mean. |
+| [hybrid_control.py](examples/hybrid_control.py) | Finite bounded command selection and one component-MNIW update | Exact categorical selector, positive-variance regressor approximation, and ordinary affine sensor. |
 | [exponential_family.py](examples/exponential_family.py) | Gamma–Poisson conjugate inference | Exact registered tree posterior and BFE |
 | [hard_constraint.py](examples/hard_constraint.py) | All-different marginals and max-product MAP | Exact bounded tree CSP identities |
 | [nonlinear_gaussian.py](examples/nonlinear_gaussian.py) | Sigma-point nonlinear Gaussian inference | Declared approximate objective metadata |
+| [physical_mean_training.py](examples/physical_mean_training.py) | Fit one cooling rate across repeated measurements | Certified point updates and objective before and after training |
 | [cstr_planning.py](examples/cstr_planning.py) | Registered reactor physics, partial goals, status-bearing plans, portable source bundle | Declared short-horizon Gaussian approximation; no hard actuator bounds |
 | [learning_bundle.py](examples/learning_bundle.py) | Declared learning, save/load, later-trial continuation | Current-schema immutable prior plus posterior state |
 | [finite_hypotheses.py](examples/finite_hypotheses.py) | Pendulum length inference from noisy velocity readings | Exact posterior on three specified lengths |

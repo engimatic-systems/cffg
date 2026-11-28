@@ -20,7 +20,7 @@ import numpy as np
 from cffg.fixed_point import RootProgram, root_context
 from cffg.outer import OuterArrays, build_outer_chart, chart_coordinates
 from cffg.runtime_types import RunStatus
-from cffg.trainable import NeuralParameters
+from cffg.trainable import MeanParameters
 
 
 class GradientStatus(StrEnum):
@@ -39,7 +39,7 @@ class FixedPointGradient:
     value: float = float("nan")
     gradient: jax.Array | None = None
     weights: jax.Array | None = None
-    parameters: NeuralParameters | None = None
+    parameters: MeanParameters | None = None
     root_residual: float = float("inf")
     adjoint_residual: float = float("inf")
     adjoint_gain: float = float("inf")
@@ -81,7 +81,7 @@ class FixedPointDifferentiator:
                 raise ValueError(f"{name} must be a positive integer")
         self.engine = engine
         self.factors = None if factors is None else tuple(factors)
-        self.parameters = NeuralParameters.from_engine(engine, reference.state.params, self.factors)
+        self.parameters = MeanParameters.from_engine(engine, reference.state.params, self.factors)
         self.dtype = np.asarray(self.parameters.extract(reference.state.params)).dtype
         eps = np.finfo(self.dtype).eps
         if tolerance is not None and (not np.isfinite(tolerance) or tolerance <= 0):
@@ -138,7 +138,7 @@ class FixedPointDifferentiator:
             return refused
         state, chart, parameters = result.state, self.chart, self.parameters
         try:
-            current = NeuralParameters.from_engine(self.engine, state.params, self.factors)
+            current = MeanParameters.from_engine(self.engine, state.params, self.factors)
         except (ValueError, KeyError) as error:
             return FixedPointGradient(GradientStatus.UNSUPPORTED, str(error))
         weights = parameters.extract(state.params)
@@ -183,7 +183,7 @@ def fixed_point_gradient(engine, result, *, factors=None, tolerance=None, max_it
     if max_iterations <= 0:
         return FixedPointGradient(GradientStatus.ADJOINT_BUDGET, "positive adjoint iteration budget required")
     try:
-        NeuralParameters.from_engine(engine, result.state.params, factors)
+        MeanParameters.from_engine(engine, result.state.params, factors)
     except (ValueError, KeyError) as error:
         return FixedPointGradient(GradientStatus.UNSUPPORTED, str(error))
     try:

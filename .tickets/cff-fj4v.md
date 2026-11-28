@@ -1,6 +1,6 @@
 ---
 id: cff-fj4v
-status: open
+status: closed
 deps: []
 links: [cff-wdhj]
 created: 2026-09-25T03:46:26Z
@@ -47,3 +47,15 @@ These are suggestions; another method is acceptable if it satisfies the outcomes
 Regressor: known input used to estimate a transition. Component-MNIW: one regression posterior per mixture component. Selector: categorical variable selecting a regime. Per-arm: updating only the option that was actually executed.
 
 Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numerical array/compiler library; dtype is a numeric storage type; free energy is the model's inference objective; host/JIT compares Python-side and compiled execution; single/vmap compares one instance with vectorized instances; N/A means not applicable.
+
+## Notes
+
+**2026-11-28T04:30:20Z**
+
+The published #207 main already provides observe_interior on built-in Gaussian prior and affine endpoints, together with the fixed-affine Gaussian rolling facade. The two manual recipes use the existing runtime and learning semantics. Architecture path: Learnable or checkpoint feature, consumer side only. Both examples use public compile/bind/run and the declared learner. The affine example exercises the scheduled tree and verifies exact regressor statistics and tied MNIW against a direct regression solve. The mixture example exercises ordinary mixed/flooding execution with a categorical DATA selector, an ordinary Gaussian emission, missing outcomes and a positive-variance regressor. It compares posterior input moments with scalar conditioning, proves unused components unchanged and demonstrates sensitivity of the estimated slope. Single/vmap, serializers and legacy checkpoint decode are N/A for these manual examples. README retains the separate documented Gaussian bundle/checkpoint path.
+
+Focused qualification on origin/main a774a54 (#207). Ran both standalone examples in float32 and float64, including subprocess entrypoints from a clean working directory. The continuous raw proposals are about 0.63751 and -0.84711, and the learner uses the applied 0.35 and -0.35. In the hybrid example prior variances 0.08 and 0.005 give posterior input means 0.370588 and 0.305868, and fitted slopes 0.396807 and 0.361917. The handoff retains in_progress for the coordinated final short-suite gate and closure. The parent is integrating the physical-mean training example and owns the combined gate.
+
+**2026-11-28T06:47:55Z**
+
+The two standalone control examples both passed in fresh subprocesses on the combined training branch. The final short suite at b04186e passed all 2,863 tests in 440.55 s. The review PR stacks on the parameter-inference branch and includes the README catalogue and scope labels.

@@ -15,6 +15,8 @@ import cffg.viz
 REPO = Path(__file__).resolve().parents[1]
 README = REPO / "README.md"
 EXAMPLES = {
+    "examples/continuous_control.py",
+    "examples/hybrid_control.py",
     "examples/cstr_planning.py",
     "examples/discrete_agent.py",
     "examples/discrete_rollout.py",
@@ -26,6 +28,7 @@ EXAMPLES = {
     "examples/learning_bundle.py",
     "examples/linear_gaussian.py",
     "examples/nonlinear_gaussian.py",
+    "examples/physical_mean_training.py",
 }
 CAPABILITIES = (
     "Build the graph IR, compose, plate, and edit",
@@ -45,7 +48,7 @@ CAPABILITIES = (
     "Build or fit an rSLDS",
     "Use nonlinear Gaussian factors",
     "Use neural means and fixed-point gradients",
-    "Train or amortize neural inference",
+    "Train physical or neural means and amortize inference",
     "Use hard constraints or MAP",
     "Batch matching structures",
     "Register an ordinary custom factor",

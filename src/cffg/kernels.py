@@ -232,6 +232,10 @@ def register_kernel(k: FactorKernel) -> FactorKernel:
                 problems.append(f"{mode} readout must be callable when declared")
     if isinstance(k.binding, GaussianBinding):
         b = k.binding
+        if b.point_trainable is not None and type(b.point_trainable) is not bool:
+            problems.append("Gaussian point_trainable declaration must be a boolean")
+        if b.point_trainable is True and "parameters" not in b.parameters:
+            problems.append("point-trainable Gaussian binding requires the parameters role")
         if k.factor_type.family != "gaussian":
             problems.append("Gaussian binding requires a Gaussian FactorType")
         if b.roles != k.factor_type.edge_roles:

@@ -1,4 +1,4 @@
-"""Canonical neural weight blobs and differentiable injection into packed rows."""
+"""Tied point-parameter blobs and differentiable injection into packed rows."""
 
 from dataclasses import dataclass
 
@@ -15,7 +15,7 @@ class WeightBlob:
 
 
 @dataclass(frozen=True)
-class NeuralParameters:
+class MeanParameters:
     """One coordinate vector per serialized blob, shared by every reader."""
 
     blobs: tuple[WeightBlob, ...]
@@ -28,12 +28,12 @@ class NeuralParameters:
     def from_engine(cls, engine, params, factors=None):
         supported = {
             name for group in engine.arena.gauss_groups
-            if group.kernel is not None and "network_parameters" in group.kernel.binding.work
+            if group.kernel is not None and group.kernel.binding.supports_point_training
             for name in group.members
         }
         selected = supported if factors is None else set(factors)
         if not selected or not selected <= supported:
-            raise ValueError("trainable factors must name compiled neural Gaussian means")
+            raise ValueError("trainable factors must name point-trainable Gaussian means")
         names = {engine.arena.member_of[name].parameter("parameters").blob for name in selected}
         blobs, start = [], 0
         for name in sorted(names):
@@ -45,8 +45,8 @@ class NeuralParameters:
             rows = tuple(sorted({(address.key, address.index) for address in addresses}))
             values = [np.asarray(params[key][index]) for key, index in rows]
             reference = values[0]
-            if reference.ndim != 1 or not np.isfinite(reference).all():
-                raise ValueError(f"trainable blob {name!r} requires finite flat weights")
+            if reference.ndim != 1 or reference.size == 0 or not np.isfinite(reference).all():
+                raise ValueError(f"trainable blob {name!r} requires a nonempty finite flat vector")
             if any(not np.array_equal(reference, value) for value in values[1:]):
                 raise ValueError(f"trainable blob {name!r} has inconsistent tied rows")
             blobs.append(WeightBlob(name, start, reference.size, rows))
@@ -68,3 +68,6 @@ class NeuralParameters:
 
     def values(self, weights):
         return {blob.name: weights[blob.start:blob.start + blob.size] for blob in self.blobs}
+
+
+NeuralParameters = MeanParameters

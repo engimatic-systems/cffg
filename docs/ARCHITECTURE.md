@@ -1022,8 +1022,12 @@ dynamic. `OuterKernelProvider` builds its cached trust and diagnostic kernels
 from this program, so training uses the same equations.
 `implicit.py` differentiates the complete root and raw energy with a matrix-free
 transposed solve (DERIVATIONS D14). Its result exposes a gradient only after
-fresh root and original-adjoint residual certificates. `trainable.py` owns
-canonical weight coordinates and differentiable injection into all tied readers.
+fresh root and original-adjoint residual certificates. A `MeanImplementation`
+advertises differentiable point parameters with `point_trainable=True`. The
+configured Gaussian binding carries this declaration into factor selection.
+`trainable.py` owns one coordinate per parameter blob element and differentiable
+injection into all tied readers. `MeanTrainer` and its compatible
+`NeuralTrainer` name share the version 1 optimizer checkpoint.
 `FixedPointDifferentiator` reuses a fixed coordinate metric across training
 updates while passing all numerical context dynamically. `training.py` owns
 full-batch Adam state and applies only certified gradients. Its versioned
