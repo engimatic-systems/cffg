@@ -1,7 +1,7 @@
 ---
 id: cff-cj5h
 status: open
-deps: []
+deps: [cml-hj19, cml-6ba0, cml-xdw1]
 links: [cff-i45j, cff-gul8, cff-fxmj, cff-hp3y, cff-4oq8]
 created: 2026-07-06T00:37:22Z
 type: task
@@ -325,3 +325,16 @@ Evidence and source preservation:
 Retained wiggle candidates after the 2026-08-07 bounded scan (candidate -> intended meaning): fixed -> a supplied goal matrix or a pinned compiled input; preserve -> value identity, semantic identity, or checkpoint continuation; public -> a documented package contract; reusable -> shared validation vocabulary; same -> value equality, matched experimental controls, or one shared mathematical implementation; expose -> export the named lint call; implement -> shared code construction or planned work; support -> probability support or an explicitly accepted input boundary; complete -> completion of this ticket review in the final marker; land -> durable artifacts entering the repository in one implementation commit; remaining -> work still represented by the ergonomics todo note; approximate -> the named GFE family bound or approximation; close -> administrative completion of a named historical ticket; near -> a probability below the maximum by a stated amount or a configurable near-tie policy outside this ticket; check -> an automated assertion or structural validation; converge -> a `RunStatus.CONVERGED` runtime result; correct -> mathematical or structural validity; equivalent -> value equality of compiled arenas; evidence -> empirical results or observation input; exact -> literal floating-point equality, exact probability zero, exact tree or channel semantics, or absence of an applicable change-path row; match -> agreement under a stated numeric bound; oracle -> an independently implemented numerical reference; reproduce -> seeded sequence reproduction; robust -> compliance with the numerical-robustness contract; sound -> an alternative method satisfying the outcomes; stable -> an identifier or ordering promised by the documented contract; test -> an automated executable check; validate -> structural model validation; infer -> the named inference or control calculation; learn -> the multi-episode parameter-learning result; scale -> model cardinality or term-count growth; small -> the suggested lint record's code size; can -> user or engine capability described by the sentence; expected -> mathematical expectation or expected parameter moments; intended -> declared absence of specified repository changes; may -> permission, possibility, or prohibition as fixed by the sentence; will -> the map records that no normative ticket sentence retains this candidate; explicit_owner -> this ticket owns lint, ledger diagnostics, and exact-tie action choice, while cff-gul8 owns predictive port EIG; named_ticket_handoff -> cff-gul8 is the concrete downstream owner; scope_exclusion -> cff-gul8 is explicitly denied ownership of ledger decomposition; all -> every breakdown owner total; any -> every diagnostic guard in the named class; at_least -> an inclusive minimum count; every -> each member of the locally named factor, component, criterion, or action set; current -> the current/legacy checkpoint review pair; existing -> behavior present at commit `63c7a51`; later -> historical ordering of cff-i45j after the original finding; read -> machine access to a `State` or breakdown.
 
 Intelligible-ticket review: complete.
+
+**2026-11-28T04:28:39Z**
+
+Triage at actual origin/main a774a54. The compiler has no lint option, Engine.bfe returns the scalar ledger, and RollingAgent uses numpy.argmax for MAP. The 98 original outcomes remain the detail index for these three independent work packages. The unary diagnostic accounts for random parameter edges. Criterion 73 specifies the new exact-tie MAP behavior. Its child owns migration and RNG continuation.
+
+Legend: prerequisite --> dependent
+[cml-hj19] structural lint (in progress) ----------+
+[cml-xdw1] action ties (ready) --------------------+--> [cff-cj5h] ergonomics complete
+[cml-6ba0] ledger components (ready) --------------+
+    |
+    +--> [cff-gul8] predictive DATA-port EIG
+
+Only the ledger breakdown blocks the sensor-value ticket. Reviewed tk dep tree --full for both dependents, tk ready and tk blocked. tk dep cycle found no cycles.
