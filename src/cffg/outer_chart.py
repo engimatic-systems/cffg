@@ -110,6 +110,45 @@ def _unit_scaled(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return eye / unit, eye * unit
 
 
+def _gaussian_blocks(arena, g_lam, dtype, eliminated):
+    """Compute the current edge metrics in equal-dimension LAPACK batches."""
+    groups = {}
+    for edge in arena.edges.values():
+        if edge.dim:
+            groups.setdefault(edge.dim, []).append(edge)
+
+    blocks = []
+    proper = True
+    for dim, edges in groups.items():
+        slots = np.array([(edge.slot0, edge.slot1) for edge in edges])
+        eta_indices = arena.g_eta_indices(slots, dim)
+        lam_indices = arena.g_lam_indices(slots, dim)
+        aggregate = g_lam[lam_indices[:, 0]] + g_lam[lam_indices[:, 1]]
+        aggregate = 0.5 * (aggregate + aggregate.swapaxes(-1, -2))
+        scale = np.linalg.norm(aggregate, ord=2, axis=(-2, -1))
+        rank_floor = np.finfo(dtype).eps * dim * scale
+        admitted = np.linalg.eigvalsh(aggregate)[:, 0] > rank_floor
+        proper = proper and bool(admitted.all())
+
+        # An improper edge keeps its identity chart even when both slots are eliminated.
+        identity = np.eye(dim, dtype=dtype)
+        aggregate[~admitted] = identity
+        whitening = np.linalg.cholesky(aggregate)
+        forward, inverse = _linear_map(np.linalg.inv(whitening))
+        lower = np.argwhere(np.tril(np.ones((dim, dim), dtype=bool)))
+        for i, edge in enumerate(edges):
+            eta_forward, eta_inverse, metric = (
+                (forward[i], inverse[i], whitening[i]) if admitted[i] else (identity,) * 3
+            )
+            for side, slot in enumerate(slots[i]):
+                if slot in eliminated:
+                    continue
+                vector = _VectorBlock("g_eta", eta_indices[i, side], eta_forward, eta_inverse)
+                precision = _PrecisionBlock(lam_indices[i, side], lower, metric)
+                blocks.append((edge.name, side, vector, precision))
+    return blocks, proper
+
+
 def build_outer_chart(
     arena: Arena | OuterStructure,
     arrays: OuterArrays,
@@ -167,47 +206,13 @@ def build_outer_chart(
                     )
                 )
 
-    g_eta = np.asarray(arrays.g_eta)
-    g_lam = np.asarray(arrays.g_lam)
-    for edge in sorted(arena.edges.values(), key=lambda item: item.name):
-        if not edge.dim:
-            continue
-        dim = edge.dim
-        eta_indices = [
-            arena.g_eta_indices(slot, dim) for slot in (edge.slot0, edge.slot1)
-        ]
-        lam_indices = [
-            arena.g_lam_indices(slot, dim) for slot in (edge.slot0, edge.slot1)
-        ]
-        aggregate = sum(
-            g_lam[index.reshape(-1)].reshape(dim, dim)
-            for index in lam_indices
-        )
-        aggregate = 0.5 * (aggregate + aggregate.T)
-        operator_scale = float(np.linalg.norm(aggregate, ord=2))
-        rank_floor = np.finfo(dtype).eps * dim * operator_scale
-        if np.linalg.eigvalsh(aggregate).min(initial=np.inf) > rank_floor:
-            whitening = np.linalg.cholesky(aggregate)
-        else:
-            whitening = np.eye(dim, dtype=dtype)
-            proper = False
-        eta_forward, eta_inverse = _linear_map(
-            np.linalg.inv(whitening)
-        )
-        lower = np.argwhere(np.tril(np.ones((dim, dim), dtype=bool)))
-        for slot, eta_index, lam_index in zip(
-            (edge.slot0, edge.slot1), eta_indices, lam_indices
-        ):
-            if slot in gaussian_eliminated:
-                continue
-            vectors.append(
-                _VectorBlock(
-                    "g_eta", eta_index, eta_forward, eta_inverse
-                )
-            )
-            precisions.append(
-                _PrecisionBlock(lam_index, lower, whitening)
-            )
+    gaussian_blocks, gaussian_proper = _gaussian_blocks(
+        arena, np.asarray(arrays.g_lam), dtype, gaussian_eliminated,
+    )
+    for _, _, vector, precision in sorted(gaussian_blocks):
+        vectors.append(vector)
+        precisions.append(precision)
+    proper = proper and gaussian_proper
 
     ef_eta = np.asarray(arrays.ef_eta)
     for edge in sorted(arena.edges.values(), key=lambda item: item.name):
