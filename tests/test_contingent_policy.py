@@ -159,7 +159,8 @@ def test_support_shape_depth_and_size_admission():
                                  Bs=np.eye(2)[None], c=[.5, .5])
 
 
-@pytest.mark.parametrize("open_loop", [False, pytest.param(True, marks=pytest.mark.slow)])
+@pytest.mark.slow
+@pytest.mark.parametrize("open_loop", [False, True])
 def test_two_readings_require_two_distinct_contingent_moves(open_loop):
     # Buy both readings (-.25) or stay home (0). The first response must match
     # the first bit, and the second must name their parity to earn +1 vs -1.
