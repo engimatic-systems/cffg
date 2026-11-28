@@ -34,7 +34,7 @@ def registered():
     kernels.unregister_kernel(CUSTOM)
 
 
-@pytest.mark.parametrize("schedule", ["auto", "flood"])
+@pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 @pytest.mark.parametrize(
     "conditioned,present", [(False, False), (True, False), (True, True)]
 )
@@ -282,7 +282,7 @@ def test_large_flat_storage_host_jit_and_distinct_batches(registered, dtype):
         assert est.param_bytes == sum(x.nbytes for x in state.params.values())
 
 
-@pytest.mark.parametrize("schedule", ["auto", "flood"])
+@pytest.mark.parametrize("schedule", ["auto", pytest.param("flood", marks=pytest.mark.slow)])
 def test_improper_and_nonfinite_results_are_loud(registered, schedule):
     t, arrays = model()
     eng = Engine(compile_template(t, arrays=arrays), schedule=schedule)

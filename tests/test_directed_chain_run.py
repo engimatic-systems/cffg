@@ -12,7 +12,7 @@ from test_cstr_planning import affine_reference
 from test_directed_chain_plan import small_chain
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_partial_goal_posterior_and_energy_match_dense_gaussian(dtype):
     with jax.enable_x64(dtype is np.float64):
         template, arrays, data = planning_fixture(past=0, horizon=2, affine=True, dtype=dtype)

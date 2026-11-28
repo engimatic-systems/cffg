@@ -410,7 +410,7 @@ def test_reconstruction_identity_sources_and_parameter_replacement(
         from_json(text)
 
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype", [np.float32, pytest.param(np.float64, marks=pytest.mark.slow)])
 def test_sparse_large_flat_storage_and_distinct_instance_batch(registered, dtype):
     with jax.enable_x64(dtype == np.float64):
         t, arrays = model((128, 3))

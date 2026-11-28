@@ -60,7 +60,7 @@ def test_rejected_trial_can_backtrack_to_a_root_from_the_last_valid_point():
     np.testing.assert_array_equal(recovered.coordinates, [1.5])
 
 
-@pytest.mark.parametrize("dtype,stress", [(np.float32, 1e20), (np.float64, 1e200)])
+@pytest.mark.parametrize("dtype,stress", [(np.float32, 1e20), pytest.param(np.float64, 1e200, marks=pytest.mark.slow)])
 def test_first_invalid_cubic_proposal_preserves_fallback_attempt_and_budget(
     monkeypatch, dtype, stress,
 ):

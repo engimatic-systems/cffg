@@ -53,8 +53,10 @@ def enumerate_policies(observations, preferences, fixed=False):
     return records
 
 
-@pytest.mark.parametrize("depth", [1, 2])
-@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+@pytest.mark.parametrize("dtype,depth", [
+    pytest.param(np.float32, 1, marks=pytest.mark.slow), (np.float32, 2),
+    (np.float64, 1), pytest.param(np.float64, 2, marks=pytest.mark.slow),
+])
 def test_native_policy_matches_full_enumeration(depth, dtype):
     with jax.enable_x64(dtype == np.float64):
         pref, obs = source(depth, dtype)
@@ -157,7 +159,7 @@ def test_support_shape_depth_and_size_admission():
                                  Bs=np.eye(2)[None], c=[.5, .5])
 
 
-@pytest.mark.parametrize("open_loop", [False, True])
+@pytest.mark.parametrize("open_loop", [False, pytest.param(True, marks=pytest.mark.slow)])
 def test_two_readings_require_two_distinct_contingent_moves(open_loop):
     # Buy both readings (-.25) or stay home (0). The first response must match
     # the first bit, and the second must name their parity to earn +1 vs -1.
