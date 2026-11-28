@@ -928,6 +928,10 @@ External wires follow deterministic routes around factor boxes. At crowded
 factors, ports and parameter terminals use the free sides before sharing one.
 A variable name sits beside its wire. A parameter name sits at its square terminal.
 Terminals that share a side extend different distances so each caption has room.
+Gaussian wires also show `ℝᵈ`, where `d` is the variable's declared dimension.
+The extra ring distinguishes a continuous boundary while keeping the filled
+observation bead for DATA and the empty bead for an open port. GLUE stays an
+ellipsis and fixed parameters stay square terminals.
 Disconnected components are laid out independently and stacked without overlap.
 Use `render_svg` for a template, or `to_svg` after constructing a scene:
 

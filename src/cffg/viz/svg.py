@@ -57,7 +57,8 @@ def render_svg(
 ) -> str:
     """Template -> SVG string at the given compression level (0..4)."""
     if svg_style is not None:
-        layout_style = replace(layout_style, label_size=svg_style.label_size, caption_size=svg_style.tiny_size)
+        layout_style = replace(layout_style, label_size=svg_style.label_size,
+                               caption_size=svg_style.tiny_size, continuous_terminal_radius=svg_style.bead_r)
     return to_svg(build_scene(template, level=level, style=layout_style), svg_style)
 
 
@@ -199,6 +200,12 @@ def _render_item(item, s: SvgStyle) -> str:
                 f'font-style="italic" stroke="none" fill="{s.stroke}">'
                 f"{_mathify(item.label, s.label_size)}</text>"
             )
+        if domain := item.domain_label:
+            label += (
+                f'<text x="{domain.x:.1f}" y="{domain.y:.1f}" font-size="{domain.size}" '
+                f'font-style="italic" stroke="none" fill="{s.stroke}" '
+                f'text-anchor="{domain.anchor}">{escape(domain.text)}</text>'
+            )
         dash = ' stroke-dasharray="4 3"' if item.dashed else ""
         return f'<path d="{d}"{dash}/>{label}'
     if isinstance(item, Box):
@@ -258,6 +265,8 @@ def _bead(item: Bead, s: SvgStyle) -> str:
 
 
 def _terminal(item: Terminal, s: SvgStyle) -> str:
+    ring = item.ring_radius
+    r = item.radius if ring is not None else s.bead_r
     if item.kind is TerminalKind.POINTMASS:
         h = s.terminal_size / 2
         mark = (
@@ -267,19 +276,21 @@ def _terminal(item: Terminal, s: SvgStyle) -> str:
         lx, ly = item.x, item.y - h - 5
     elif item.kind is TerminalKind.DATA:
         mark = (
-            f'<circle cx="{item.x:.1f}" cy="{item.y:.1f}" r="{s.bead_r:.1f}" '
+            f'<circle cx="{item.x:.1f}" cy="{item.y:.1f}" r="{r:.1f}" '
             f'fill="{s.stroke}"/>'
-            f'<text x="{item.x:.1f}" y="{item.y:.1f}" font-size="{s.bead_r * 1.7:.1f}" '
+            f'<text x="{item.x:.1f}" y="{item.y:.1f}" font-size="{r * 1.7:.1f}" '
             'stroke="none" fill="#ffffff" text-anchor="middle" '
             f'dominant-baseline="central">{_BEAD_SYMBOLS["delta"]}</text>'
         )
-        lx, ly = item.x, item.y + s.bead_r + 11
+        lx, ly = item.x, item.y + r + 11
     else:  # OPEN: dangling edge terminated by an (empty) bead, §5.2
         mark = (
-            f'<circle cx="{item.x:.1f}" cy="{item.y:.1f}" r="{s.bead_r:.1f}" '
+            f'<circle cx="{item.x:.1f}" cy="{item.y:.1f}" r="{r:.1f}" '
             'fill="#ffffff"/>'
         )
-        lx, ly = item.x, item.y + s.bead_r + 11
+        lx, ly = item.x, item.y + r + 11
+    if ring is not None:
+        mark = f'<circle cx="{item.x:.1f}" cy="{item.y:.1f}" r="{ring:.1f}" fill="none"/>' + mark
     if item.label_at is not None:
         lx, ly = item.label_at
     label = (

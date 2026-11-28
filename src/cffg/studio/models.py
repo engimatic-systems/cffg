@@ -35,6 +35,10 @@ def _describe_scene_item(item):
             label_font_role=label.font_role,
             label_anchor=label.anchor,
         )
+    if isinstance(item, ScenePath) and item.domain_label:
+        record["domain_label_bounds"] = item.domain_label.bounds
+    if isinstance(item, Terminal) and item.ring_radius is not None:
+        record["ring_radius"] = item.ring_radius
     return record
 
 

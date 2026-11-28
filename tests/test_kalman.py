@@ -147,18 +147,127 @@ def test_lgssm_renders_at_every_level(viz_gallery):
         viz_gallery(svg, tag=f"LGSSM T=3, level {level}")
 
 
+def domain_lgssm(steps=3):
+    state = np.eye(4)
+    template, _ = lgssm(steps, state, .1 * state, state[[0, 2]], np.eye(2), np.zeros(4), state)
+    return template
+
+
+def _disjoint(left, right):
+    return (min(left[2], right[2]) <= max(left[0], right[0])
+            or min(left[3], right[3]) <= max(left[1], right[1]))
+
+
+def _check_domain_geometry(scene, path):
+    from cffg.viz.scene import Path, Terminal
+
+    extent = path.domain_label.bounds
+    assert np.isfinite(extent).all()
+    x, y, u, v = extent
+    assert 0 < x < u < scene.width and 0 < y < v < scene.height
+    for box in scene.boxes().values():
+        assert _disjoint(extent, (box.x - box.w / 2, box.y - box.h / 2,
+                                  box.x + box.w / 2, box.y + box.h / 2))
+    for wire in scene.by_ref(path.ref):
+        if isinstance(wire, Path):
+            for (a, b), (c, d) in zip(wire.points, wire.points[1:]):
+                assert _disjoint(extent, (min(a, c) - .65, min(b, d) - .65,
+                                          max(a, c) + .65, max(b, d) + .65))
+    for item in scene.items:
+        if isinstance(item, Terminal) and item.ring_radius is not None:
+            r = item.ring_radius + .65
+            assert _disjoint(extent, (item.x - r, item.y - r, item.x + r, item.y + r))
+
+
+def test_lgssm_domain_metadata_and_geometry_at_every_level(viz_gallery):
+    import xml.etree.ElementTree as ET
+    from cffg.viz import build_scene, derive, to_svg
+    from cffg.viz.diagram import TerminalEnd, TerminalKind
+    from cffg.viz.scene import Path, Terminal
+
+    template = domain_lgssm()
+    diagram = derive(template)
+    expected = {f"var:{name}": (name, spec.dim) for name, spec in template.variables.items()}
+    for ref, (name, dimension) in expected.items():
+        wire = diagram.wires[ref]
+        assert (wire.family, wire.dimension, wire.label) == ("gaussian", dimension, name)
+    assert all(not wire.dimension for wire in diagram.wires.values() if wire.id.startswith("blob:"))
+    refs = {f"factor:{name}" for name in template.factors} | set(diagram.wires)
+    refs |= {end.ref for wire in diagram.wires.values() for end in wire.ends if isinstance(end, TerminalEnd)}
+
+    for level in range(5):
+        scene = build_scene(template, level=level)
+        assert {item.ref for item in scene.items} == refs
+        marked = [item for item in scene.items if isinstance(item, Path) and item.domain_label]
+        assert sorted(item.ref for item in marked) == sorted(expected)
+        for path in marked:
+            name, dimension = expected[path.ref]
+            label = path.domain_label
+            assert (label.ref, label.text, path.label) == (path.ref, {2: "ℝ²", 4: "ℝ⁴"}[dimension], name)
+            assert label in scene.labels()
+            _check_domain_geometry(scene, path)
+
+        svg = to_svg(scene)
+        assert svg == to_svg(build_scene(template, level=level))
+        root = ET.fromstring(svg)
+        for name in template.ports:
+            mark, = [t for t in scene.by_ref(f"port:{name}") if isinstance(t, Terminal)]
+            assert (mark.kind, mark.dimension, mark.label) == (TerminalKind.DATA, 2, name)
+            group, = [g for g in root.findall(".//{*}g") if g.findtext("{*}title") == mark.ref]
+            outer, inner = group.findall("{*}circle")
+            assert outer.get("fill") == "none" and inner.get("fill") != "none"
+            assert float(outer.get("r")) == mark.ring_radius > float(inner.get("r"))
+            assert (inner.get("cx"), inner.get("cy")) == (outer.get("cx"), outer.get("cy"))
+            assert any(node.text == "∂" and node.get("fill") == "#ffffff" for node in group.findall("{*}text"))
+        if level in (0, 4):
+            viz_gallery(svg, tag=f"LGSSM ℝ⁴/ℝ², level {level}")
+
+
+@pytest.mark.parametrize("level", [0, 4])
+def test_lgssm_growth_retains_early_domain_label_and_terminal_coordinates(level):
+    from cffg.viz import build_scene, derive
+    from cffg.viz.diagram import TerminalEnd
+    from cffg.viz.scene import Path, Terminal
+
+    old, new = [build_scene(domain_lgssm(steps), level=level) for steps in (3, 4)]
+    factors = {"prior", "eq0", "trans1", "emis0", "eq1", "trans2", "emis1"}
+    for name in factors:
+        a, b = [scene.boxes()[f"factor:{name}"] for scene in (old, new)]
+        assert (a.x, a.y) == (b.x, b.y), name
+    for name in ("x0", "x0c", "x0o", "y0", "x1", "x1c", "x1o", "y1"):
+        a, b = [next(item for item in scene.by_ref(f"var:{name}") if isinstance(item, Path))
+                for scene in (old, new)]
+        assert a.points == b.points and a.domain_label == b.domain_label, name
+    for wire in derive(domain_lgssm()).wires.values():
+        ends = [end for end in wire.ends if isinstance(end, TerminalEnd)]
+        if not ends or wire.node_ends()[0].factor not in factors:
+            continue
+        positions = []
+        for scene in (old, new):
+            path = next(item for item in scene.by_ref(wire.id) if isinstance(item, Path))
+            mark = next(t for t in scene.by_ref(ends[0].ref)
+                        if isinstance(t, Terminal) and (t.x, t.y) == path.points[-1])
+            positions.append((mark.x, mark.y))
+        assert positions[0] == positions[1], wire.id
+
+
 def test_lgssm_with_glue_ports_renders(viz_gallery):
     # A single Kalman slice the way the rollout machinery would see it:
     # glue in/out plus the emission branch — the composable unit.
     import xml.etree.ElementTree as ET
 
     from cffg.core.ir import PortRole, PortSpec
-    from cffg.viz import render_svg
+    from cffg.viz import build_scene, to_svg
+    from cffg.viz.scene import EllipsisMark, Path, Terminal
 
     t, _ = lgssm(2, F, Q, H, R, M0, P0)
     del t.factors["prior"]
     t.ports["head"] = PortSpec("head", "x0", PortRole.GLUE)
-    svg = render_svg(t, level=4)
+    scene = build_scene(t, level=4)
+    assert any(isinstance(item, EllipsisMark) for item in scene.by_ref("port:head"))
+    assert all(not isinstance(item, Terminal) for item in scene.by_ref("port:head"))
+    assert sum(isinstance(item, Path) and item.domain_label is not None for item in scene.by_ref("var:x0")) == 1
+    svg = to_svg(scene)
     ET.fromstring(svg)
     viz_gallery(svg, tag="Kalman slice with glue port")
 

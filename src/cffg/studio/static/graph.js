@@ -200,7 +200,8 @@ function bounds(item) {
   }
   if (item.primitive === "Box") return [item.x-item.w/2, item.y-item.h/2, item.x+item.w/2, item.y+item.h/2];
   if (item.w) return [item.x, item.y, item.x+item.w, item.y+item.h];
-  return [item.x-8, item.y-8, item.x+8, item.y+8];
+  const r = item.ring_radius == null ? 8 : item.ring_radius + 1;
+  return [item.x-r, item.y-r, item.x+r, item.y+r];
 }
 
 function viewBounds(box, label) {
@@ -281,13 +282,21 @@ function drawRecord(record, selected, hovered) {
       if (item.dashed || constrained) attrs["stroke-dasharray"] = "5 3";
       add("path", attrs);
       placedCaption();
+      if (item.domain_label) {
+        const {x, y, text, anchor, size} = item.domain_label;
+        add("text", {x, y, class: "wire-name", "text-anchor": anchor,
+          style: `font-size: ${size}px`}, text);
+      }
       break;
     }
     case "Terminal":
       if (item.kind === "pointmass") {
         add("rect", {x:x-3.5, y:y-3.5, width:7, height:7, fill:"currentColor"});
       } else {
-        add("circle", {cx:x, cy:y, r:5, stroke:"currentColor", "stroke-width":1.6,
+        if (item.ring_radius != null) {
+          add("circle", {cx:x, cy:y, r:item.ring_radius, stroke:"currentColor", "stroke-width":1.6, fill:"none"});
+        }
+        add("circle", {cx:x, cy:y, r:item.ring_radius == null ? 5 : item.radius, stroke:"currentColor", "stroke-width":1.6,
           fill:item.kind === "data" ? "currentColor" : "#24272d"});
         if (item.kind === "data") add("path", {d:`M${x-2.5} ${y}h5`, stroke:"#332613","stroke-width":1.5});
       }
@@ -380,7 +389,7 @@ export function mountGraph(container, snapshot, selectCallback) {
     if (localRef.startsWith("gfe:")) localRef = "factor:" + localRef.slice(4);
     const group = localRef.startsWith("blob:") ? blobGroup(localRef) : model.hoverGroup(localRef);
     return {id, item, model, group, localRef, ref:plateRef || localRef,
-      box, viewBox: viewBounds(box, item.label_bounds)};
+      box, viewBox: viewBounds(viewBounds(box, item.label_bounds), item.domain_label_bounds)};
   });
   bindMarginalHover(rows);
   const byRef = new Map();
