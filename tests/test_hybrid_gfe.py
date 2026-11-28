@@ -6,6 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from cffg import hybrid_gfe
+from cffg.compiled import NEG
 from cffg.compiler import CompileError, compile_template
 from cffg.core.ir import (
     BlobRef,
@@ -347,6 +349,81 @@ def test_exact_zero_selector_support_stays_exact():
     diagnostic = engine.hybrid_gfe_diagnostics(result.state)["emission"]
     np.testing.assert_array_equal(diagnostic["rho"], [1.0, 0.0])
     assert diagnostic["mi_regime_surrogate"] == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.parametrize("dtype, regimes", [(np.float32, 32), (np.float64, 4)])
+def test_sparse_pairwise_entropy_bound_derivatives(dtype, regimes):
+    # Differentiate the scalar Gaussian overlaps on the occupied labels in float64.
+    rho = np.zeros(regimes, dtype=dtype)
+    rho[[0, regimes // 2, -1]] = [.125, .375, .5]
+    means = np.linspace(-1.5, 2., regimes, dtype=dtype)
+    variances = np.linspace(.25, 1.5, regimes, dtype=dtype)
+    active = rho > 0
+    p, m, v = (arr[active].astype(np.float64) for arr in (rho, means, variances))
+    delta = m[:, None] - m
+    var = v[:, None] + v
+    overlap = np.exp(-.5 * delta**2 / var) / np.sqrt(2 * np.pi * var)
+    density = overlap @ p
+    expected = -p @ np.log(density)
+    pair_weight = (p / density)[:, None] * overlap * p
+    # Every component occurs as both the evaluation point and a mixture term.
+    both = pair_weight + pair_weight.T
+    gradients = (
+        -np.log(density) - overlap.T @ (p / density),
+        (both * delta / var).sum(axis=1),
+        .5 * (both * (1 / var - (delta / var)**2)).sum(axis=1),
+    )
+
+    def bound(weights, centers, spread):
+        return hybrid_gfe._pairwise_entropy_lower(
+            weights, centers[:, None], spread[:, None, None]
+        )
+
+    dp = np.zeros_like(rho)
+    dp[active] = [.25, -.5, .25]  # stay on the same simplex face
+    direction = (dp, means, variances)
+    with jax.enable_x64(dtype == np.float64):
+        args = tuple(map(jnp.asarray, (rho, means, variances)))
+        value, forward = jax.jvp(bound, args, tuple(map(jnp.asarray, direction)))
+        backward = jax.jit(jax.grad(bound, argnums=(0, 1, 2)))(*args)
+    assert all(item.dtype == dtype for item in (value, forward, *backward))
+    tol = 64 * np.finfo(dtype).eps
+    np.testing.assert_allclose(value, expected, rtol=tol, atol=tol)
+    expected_forward = sum(
+        g @ t[active] for g, t in zip(gradients, direction, strict=True)
+    )
+    np.testing.assert_allclose(forward, expected_forward, rtol=tol, atol=tol)
+    for actual, reference in zip(backward, gradients, strict=True):
+        np.testing.assert_allclose(actual[active], reference, rtol=tol, atol=tol)
+        np.testing.assert_array_equal(actual[~active], 0.)
+
+
+@pytest.mark.slow
+def test_sparse_prior_diagnostic_derivative_matches_symmetric_mixture():
+    # The two equally weighted occupied normals N(±a,1) have equal goal costs.
+    def diagnostics(a):
+        means = jnp.stack((-a, a, 0.))[None, :, None]
+        return hybrid_gfe.prior_diagnostics(
+            jnp.array([[0., 0., NEG]]), means, jnp.ones((1, 3, 1, 1)),
+            jnp.zeros((1, 1)), jnp.ones((1, 1, 1)),
+        )
+
+    a = jnp.asarray(1.25, dtype=jnp.float64)
+    diagnostic = diagnostics(a)
+    np.testing.assert_array_equal(diagnostic.status, [0])
+    np.testing.assert_allclose(diagnostic.rho[0, :2], [.5, .5], atol=1e-12, rtol=0)
+    assert diagnostic.rho[0, 2] == 0
+
+    def lower(separation):
+        return diagnostics(separation).mi_regime_lower[0]
+
+    value, forward = jax.jvp(lower, (a,), (jnp.ones_like(a),))
+    reverse = jax.grad(lower)(a)
+    cross = np.exp(-float(a)**2)
+    expected = np.log(2.) + .5 * (np.log(2.) - 1.) - np.log1p(cross)
+    slope = 2 * float(a) * cross / (1 + cross)
+    np.testing.assert_allclose(value, expected, atol=1e-12, rtol=0)
+    np.testing.assert_allclose([forward, reverse], slope, atol=1e-11, rtol=0)
 
 
 def test_float32_k32_scale_converges():

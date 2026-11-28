@@ -327,9 +327,12 @@ def _pairwise_entropy_lower(
         + gauss._pd_logdet(pair_covariance)
         + jnp.einsum("kti,ktij,ktj->kt", difference, inverse, difference)
     )
-    log_weights = jnp.where(rho > 0, jnp.log(rho), -jnp.inf)
+    active = rho > 0
+    # A finite log operand keeps the excluded weights' reverse derivatives zero.
+    log_rho = jnp.log(jnp.where(active, rho, 1.0))
+    log_weights = jnp.where(active, log_rho, -jnp.inf)
     mixtures = logsumexp(log_weights[None, :] + log_density, axis=1)
-    return -jnp.sum(jnp.where(rho > 0, rho * mixtures, 0.0))
+    return -jnp.sum(jnp.where(active, rho * mixtures, 0.0))
 
 
 def _terms(
