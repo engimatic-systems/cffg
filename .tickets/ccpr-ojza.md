@@ -1,6 +1,6 @@
 ---
 id: ccpr-ojza
-status: open
+status: in_progress
 deps: [ccpr-rl0k, cff-d56d, cff-9xmq, cff-b2fz]
 links: []
 created: 2026-11-28T05:57:47Z
@@ -35,3 +35,9 @@ Recursive compilation and the parent's resource qualification consume this path.
 ## Definitions
 
 A slot is one allocated message address. Broadcast connects copied ports to one shared hub. Expose keeps a copied port available to the caller.
+
+## Notes
+
+**2026-11-28T06:47:05Z**
+
+Base is the frozen row-major index plus the published Colony parameter-reuse handoff. Architecture row: compiler and parameter packing. Normal compile and cold Colony construction need the same topology. Cached spawns rebind numeric owners, hard constraints and schedule execution consume the same compiled addresses, and stored models remain the compact source. Use the existing flat expansion as an independent semantic oracle, including aliases, collision handling and balanced equality trees. Measure the full 64-by-64 public compile and allocations. Phase-1 source semantics, exact support and old bundles are release checks.
