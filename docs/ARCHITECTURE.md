@@ -1839,6 +1839,11 @@ them. Four rules define the contract:
    Motion and interaction writes use the current tracking mask. An observation
    with learning disabled advances the carry and closes both write masks. The
    scene integrator owns the learned banks and checkpoint envelope.
+   `Scene.identity_beliefs()` recomputes a probability for each observed
+   slot and type from the carried appearance and identity bank. Hidden slots
+   use their last stored appearance. All unused types share equal probability
+   when the bank is empty. Invalid evidence yields zero rows and a false
+   validity flag. Reading the probabilities takes no learning step.
 
    Reading is not evidence, so a learnable may restrict which instances
    supply statistics: `LearnableSpec.sources` is `None` for every reader, a

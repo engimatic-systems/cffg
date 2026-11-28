@@ -483,7 +483,9 @@ supplied two-object world model.
 The experimental Gameworld loop starts with `initialize_scene` and feeds
 `observe_scene` each new RGB frame, the action actually applied and its
 reward. The agent tracks objects and learns their identities, motions and
-interactions. Its planner queries a read-only snapshot of those learned
+interactions. Read `weights, valid = scene.identity_beliefs()` for the
+probability of each learned type per slot. A hidden slot uses its last
+observed appearance. The planner queries a read-only snapshot of the learned
 rules. The [fixed-action replay](tools/axiom/scene_replay.py) checks learning
 and restart on shared pixels. The [closed-loop smoke test](tools/axiom/acted_smoke.py)
 lets the model select the actions. Its 24-step Explode run used a reduced
