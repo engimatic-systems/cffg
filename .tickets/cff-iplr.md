@@ -1,6 +1,6 @@
 ---
 id: cff-iplr
-status: open
+status: in_progress
 deps: [cff-wi2o]
 links: []
 created: 2026-09-25T03:46:26Z
@@ -53,3 +53,15 @@ Shared terms: CFFG means constrained Forney-style factor graph; JAX is the numer
 **2026-11-28T05:01:55Z**
 
 Bounded v1 from D6d: independent positive beta shapes on finite box intervals, identifiable versioned mean implementation, known SPD Gaussian observation covariance, explicit applied inputs, missing event is a no-op. Carry normalized host log weights; calculate source-dtype native normalized likelihood, deterministic-policy ESS stratified sampling and a fixed transformed-space MH kernel on BOTH paths. Retain all observed events and the complete key/counter; any unsupported target fails before consuming the key. Freeze continuation bit parity under same backend. Gaussian 64-node reference absolute budget 64 dtype eps; two-mode 128/1280 particle checks on 48 declared seeds use <=6 empirical SE and abs bounds [.05 times Z,.03,.03,.05] for Z, mean, second moment and side mass. 128 newly simulated data sets check 4-SE calibration of median and mean posterior rank. Include zero finite population vs provable impossibility, cross-method support, corrupted covariance/model/version/keys and a restart across a resampling event. Exact posterior or evidence is not claimed for a single continuous run.
+
+**2026-11-28T05:59:47Z**
+
+Implementation handoff. Use Architecture Learnable or checkpoint feature and Runtime numerical or status invariant. Public standalone posterior retains registered mean identity/configuration, bounded beta prior, known Gaussian observation covariance, explicit transformed particles/key and applied histories. Host owns atomic commits, normalized log weights and evidence. The compiled single/vectorized exact Gaussian conditional is shared with the observed Gaussian node; verify against a graph point likelihood and closed-form/independent quadrature. Engine flooding/scheduled state transitions, IR/bundle migration and Colony execution are N/A for a standalone conditional target. Validate versioned checkpoint continuation, reject older/unknown formats, numerical range and nonfinite scores before any state change. With finite x/y/means and proper SPD Gaussian noise, the true conditional has no exact zero; an overflow is an evaluation failure, not evidence of impossibility. Retain log-space support handling in the weight fold.
+
+**2026-11-28T06:10:02Z**
+
+Implementation qualification. The standalone conditional evaluates the registered mean directly at each physical parameter and uses native normalized Gaussian point density. It applies the same transformed-space MH policy on both ESS branches, conditions each reading once, and retains all applied history. It blocks unrepresentable arithmetic without changing state or key. A beta prior concentrated at a bound can produce physical values that round outside the representable open interval and are refused. The public Gaussian conditional has positive true support; exhausted population and invalid score are distinguished in the weight fold.
+
+The initial direct Gaussian ensemble on seeds 0–47, ESS .8, one scale-1 move missed the f32/128 mean absolute limit (.045747 > .03) while within 6 SE. Other absolute metrics passed and f64/1280 passed. Qualification repeated with a separately declared policy: both modes are roughly 4 logit units apart, so use four scale-2.5 moves on both ESS branches and fresh seeds 20261128–20261175. Exact Gaussian quadrature Z=7.78985483; absolute f32/128 errors in Z, mean, second moment and positive-side mass: .228080, .003882, .000203, .002787. f64/1280: .009322, .003509, .000069, .002319. Both passed the unchanged limits and 6-SE criteria. The 128 prior-predictive data sets gave posterior rank mean .512822 and median .503215. Receipt /Users/ravd/agent-share/cffg-iplr/qualification.log. Public defaults remain one scale-1 move and ESS .5. Qualification is for the named seeded configurations.
+
+Focused and opt-in checks: 39 passed across public particles, independent D6d references and finite hypotheses, using uv run --frozen --no-sync pytest -q -s -m 'slow or not slow' tests/test_static_parameter_particles.py tests/test_static_particle_derivation.py tests/test_finite_hypotheses.py. An added stratified ancestor oracle then passed both f32/f64 with exact resumed continuation across history growth. The example worked with JAX_ENABLE_X64=0. The combined suite is pending at this commit.
