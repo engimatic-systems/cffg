@@ -91,7 +91,8 @@ This project will span many context windows. The rule that makes that survivable
   `docs/ARCHITECTURE.md` change-path index and lists each duplicated execution
   surface affected; checked pairs that do not apply are marked N/A.
 - **During implementation**, run focused test files as often as useful for the
-  changed component.
+  changed component. After a failing case passes, run a targeted suite of
+  related cases when useful to check the fix and nearby behavior.
 - **Final validation for code outside the isolated-tooling exception below**
   requires one passing short-suite run after the final code change.
   One passing suite at the proposed PR head is

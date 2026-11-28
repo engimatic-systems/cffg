@@ -513,6 +513,41 @@ def test_prior_mixture_stats_and_predictive_name_weighting_explicitly():
     )
 
 
+@pytest.mark.parametrize(("x64", "schedule"), [(False, "auto"), (True, "flood")])
+def test_centered_mixture_readout_preserves_uncertainty_at_displaced_origin(x64, schedule):
+    template, arrays = _prior_mixture_template(regimes=3, dimension=1)
+    template.ports.clear()
+    template.factors["sensor"] = FactorSpec(
+        "sensor", "gaussian", {"out": "y"},
+        param_blobs={"mean": "sensor_mean", "cov": "sensor_covariance"},
+    )
+    template.blobs.update(_blobs("sensor_mean", "sensor_covariance"))
+    means = np.array([10000., 10000.125, 10001.])
+    variances = np.array([0.5, 1., 0.25])
+    arrays.update(mean=means[:, None], covariance=variances[:, None, None],
+                  sensor_mean=np.array([10001.]), sensor_covariance=np.array([[0.25]]),
+                  probability=np.array([0.5, 0.5, 0.]))
+    with jax.enable_x64(x64):
+        engine = Engine(compile_template(template, arrays=arrays), schedule=schedule)
+        state = engine.step(engine.init_state())
+        raw = engine.gaussian_node_stats(state)["mixture"]
+        centered = engine.gaussian_node_stats(state, centered_mixtures=True)["mixture"]
+
+    assert raw["proper"] and centered["proper"]
+    np.testing.assert_array_equal(centered["responsibility"], raw["responsibility"])
+    assert centered["responsibility"][-1] == 0.
+    covariance = 1 / (1 / variances + 4.)
+    expected_mean = means + 4 * covariance * (10001. - means)
+    dtype = state.g_eta.dtype
+    np.testing.assert_allclose(centered["component_covariance"][:, 0, 0], covariance,
+                               atol=0, rtol=8 * np.finfo(dtype).eps)
+    np.testing.assert_allclose(centered["component_mean"][:, 0], expected_mean,
+                               atol=np.spacing(dtype.type(10001.)), rtol=0)
+    assert sum(value.nbytes for value in centered.values()) == sum(
+        value.nbytes for value in raw.values()
+    )
+
+
 @pytest.mark.parametrize(("linear", "schedule", "prior"), [
     (False, "auto", [0.5, 0.5]),
     (True, "flood", [0.2, 0., 0.8]),

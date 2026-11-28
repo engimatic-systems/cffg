@@ -1,8 +1,8 @@
 ---
 id: cff-7t4j
-status: open
+status: closed
 deps: []
-links: []
+links: [cff-6wpk]
 created: 2026-11-24T01:37:29Z
 type: bug
 priority: 1
@@ -45,3 +45,7 @@ At 125f0a4 the public readout on two equally weighted components at coordinate 1
 **2026-11-24T01:39:38Z**
 
 Reproducer handoff: this isolated diagnostic only reads existing public Engine outputs and writes JSON to stdout. No library, test-selection or pass/fail logic changed. Ran both dtype commands and independently checked the 20 rows, exact equality of the ambiguous raw statistics, analytic weights, translated controls and negative reconstructed variance. tk dep cycle and git diff --cached --check passed. The blocker stays open.
+
+**2026-11-24T03:34:42Z**
+
+Fixed the public prior-mixture readout and fractional NIW pooling, with a centered opt-in, compatible raw fields and unchanged checkpoint shape. At offset 10000 the corrected float32 within-component variances are 0.166666657 and 0.199999988. Matched x64 controls, eager/JIT, zero support, dense rank cases, public schedules, posterior scaling and split batches passed. Across 6 matched shapes centered readout took 3.6–5.2% longer than current raw with identical bytes. On prepared 32-record/6-feature host inputs the centered fold took 98.5 vs 42.5 microseconds and on 64/16 took 234.1 vs 61.1. This validates the repair and triggers the requested performance stop before expanding the learner. cff-6wpk records other declared families. Report and raw runs are under ~/agent-share/axiom-centered-checkpoint. Three centered/public checks, 106 conjugate-focused checks, 14 delegation checks and the final short suite passed (2749 passed, 237 deselected, wall 1183.503 s).
